@@ -7,8 +7,9 @@ import { SearchBar } from '@/components/public/SearchBar';
 import { CategoryNav } from '@/components/public/CategoryNav';
 import { unstable_cache } from 'next/cache';
 
-// Force dynamic rendering because we use searchParams
+// Force dynamic rendering and use edge runtime for Cloudflare
 export const dynamic = 'force-dynamic';
+export const runtime = 'edge';
 
 const getCategoriesCached = unstable_cache(
   async () => {

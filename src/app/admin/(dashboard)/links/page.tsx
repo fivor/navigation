@@ -3,8 +3,9 @@ import { Link, Category } from '@/types';
 import { LinkManager } from '@/components/admin/LinkManager';
 import { getSession } from '@/lib/session';
 
-// Force dynamic rendering
+// Force dynamic rendering and use edge runtime
 export const dynamic = 'force-dynamic';
+export const runtime = 'edge';
 
 async function getLinks() {
   try {

@@ -3,8 +3,9 @@ import { Category } from '@/types';
 import { CategoryManager } from '@/components/admin/CategoryManager';
 import { getSession } from '@/lib/session';
 
-// Force dynamic rendering
+// Force dynamic rendering and use edge runtime
 export const dynamic = 'force-dynamic';
+export const runtime = 'edge';
 
 async function getCategories() {
   try {
