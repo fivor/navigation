@@ -1,5 +1,4 @@
 import { sql } from '@/lib/db';
-import crypto from 'node:crypto';
 
 export interface R2Config {
   accessKeyId?: string;
@@ -11,32 +10,59 @@ export interface R2Config {
   iconMaxSize?: number;
 }
 
-function getKey(): Buffer | null {
+// Web Crypto API 兼容的加密工具函数
+async function getEncryptionKey(): Promise<CryptoKey> {
   const base = process.env.SETTINGS_ENC_KEY || process.env.AUTH_SECRET || 'fallback-key-for-navigation';
-  return crypto.createHash('sha256').update(base).digest();
+  const encoder = new TextEncoder();
+  const data = encoder.encode(base);
+  
+  // 使用 SHA-256 生成 256 位密钥
+  const hash = await crypto.subtle.digest('SHA-256', data);
+  
+  return await crypto.subtle.importKey(
+    'raw',
+    hash,
+    { name: 'AES-GCM' },
+    false,
+    ['encrypt', 'decrypt']
+  );
 }
 
-function encrypt(plain: string): string {
-  const key = getKey();
-  if (!key) throw new Error('Missing SETTINGS_ENC_KEY');
-  const iv = crypto.randomBytes(12);
-  const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
-  const enc = Buffer.concat([cipher.update(plain, 'utf8'), cipher.final()]);
-  const tag = cipher.getAuthTag();
-  return Buffer.concat([iv, tag, enc]).toString('base64');
+async function encrypt(plain: string): Promise<string> {
+  const key = await getEncryptionKey();
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const encoder = new TextEncoder();
+  const data = encoder.encode(plain);
+
+  const encrypted = await crypto.subtle.encrypt(
+    { name: 'AES-GCM', iv },
+    key,
+    data
+  );
+
+  // 拼接 IV + EncryptedData
+  const result = new Uint8Array(iv.length + encrypted.byteLength);
+  result.set(iv);
+  result.set(new Uint8Array(encrypted), iv.length);
+
+  return btoa(String.fromCharCode(...result));
 }
 
-function decrypt(encB64: string): string {
-  const key = getKey();
-  if (!key) throw new Error('Missing SETTINGS_ENC_KEY');
-  const buf = Buffer.from(encB64, 'base64');
-  const iv = buf.subarray(0, 12);
-  const tag = buf.subarray(12, 28);
-  const data = buf.subarray(28);
-  const decipher = crypto.createDecipheriv('aes-256-gcm', key, iv);
-  decipher.setAuthTag(tag);
-  const dec = Buffer.concat([decipher.update(data), decipher.final()]);
-  return dec.toString('utf8');
+async function decrypt(encB64: string): Promise<string> {
+  const key = await getEncryptionKey();
+  const combined = Uint8Array.from(atob(encB64), c => c.charCodeAt(0));
+  
+  const iv = combined.slice(0, 12);
+  const data = combined.slice(12);
+
+  const decrypted = await crypto.subtle.decrypt(
+    { name: 'AES-GCM', iv },
+    key,
+    data
+  );
+
+  const decoder = new TextDecoder();
+  return decoder.decode(decrypted);
 }
 
 export async function ensureSettingsTable() {
@@ -74,11 +100,11 @@ export async function getR2Config(userId: number): Promise<R2Config | null> {
   const row = res.rows[0] as SettingsRow | undefined;
   if (!row) return null;
   const cfg: R2Config = {};
-  try { if (row.r2_access_key_id_enc) cfg.accessKeyId = decrypt(row.r2_access_key_id_enc); } catch {}
-  try { if (row.r2_secret_access_key_enc) cfg.secretAccessKey = decrypt(row.r2_secret_access_key_enc); } catch {}
-  try { if (row.r2_bucket_enc) cfg.bucket = decrypt(row.r2_bucket_enc); } catch {}
-  try { if (row.r2_endpoint_enc) cfg.endpoint = decrypt(row.r2_endpoint_enc); } catch {}
-  try { if (row.r2_public_base_enc) cfg.publicBase = decrypt(row.r2_public_base_enc); } catch {}
+  try { if (row.r2_access_key_id_enc) cfg.accessKeyId = await decrypt(row.r2_access_key_id_enc); } catch {}
+  try { if (row.r2_secret_access_key_enc) cfg.secretAccessKey = await decrypt(row.r2_secret_access_key_enc); } catch {}
+  try { if (row.r2_bucket_enc) cfg.bucket = await decrypt(row.r2_bucket_enc); } catch {}
+  try { if (row.r2_endpoint_enc) cfg.endpoint = await decrypt(row.r2_endpoint_enc); } catch {}
+  try { if (row.r2_public_base_enc) cfg.publicBase = await decrypt(row.r2_public_base_enc); } catch {}
   if (typeof row.icon_max_kb === 'number') cfg.iconMaxKB = row.icon_max_kb;
   if (typeof row.icon_max_size === 'number') cfg.iconMaxSize = row.icon_max_size;
   return cfg;
@@ -87,11 +113,11 @@ export async function getR2Config(userId: number): Promise<R2Config | null> {
 export async function upsertR2Config(userId: number, input: R2Config) {
   const rows = await sql`SELECT id FROM app_settings WHERE user_id = ${userId} LIMIT 1`;
   const payload = {
-    r2_access_key_id_enc: input.accessKeyId ? encrypt(input.accessKeyId) : null,
-    r2_secret_access_key_enc: input.secretAccessKey ? encrypt(input.secretAccessKey) : null,
-    r2_bucket_enc: input.bucket ? encrypt(input.bucket) : null,
-    r2_endpoint_enc: input.endpoint ? encrypt(input.endpoint) : null,
-    r2_public_base_enc: input.publicBase ? encrypt(input.publicBase) : null,
+    r2_access_key_id_enc: input.accessKeyId ? await encrypt(input.accessKeyId) : null,
+    r2_secret_access_key_enc: input.secretAccessKey ? await encrypt(input.secretAccessKey) : null,
+    r2_bucket_enc: input.bucket ? await encrypt(input.bucket) : null,
+    r2_endpoint_enc: input.endpoint ? await encrypt(input.endpoint) : null,
+    r2_public_base_enc: input.publicBase ? await encrypt(input.publicBase) : null,
     icon_max_kb: input.iconMaxKB ?? 128,
     icon_max_size: input.iconMaxSize ?? 128,
   };

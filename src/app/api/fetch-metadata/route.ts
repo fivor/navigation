@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
 import * as cheerio from 'cheerio';
-import crypto from 'node:crypto';
 import { getSession } from '@/lib/session';
 import { getR2Config } from '@/lib/settings';
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
@@ -185,7 +184,11 @@ export async function POST(request: Request) {
         else if (contentType.includes('jpeg') || icon.toLowerCase().endsWith('.jpg') || icon.toLowerCase().endsWith('.jpeg')) ext = 'jpg';
         else if (contentType.includes('webp') || icon.toLowerCase().endsWith('.webp')) ext = 'webp';
         const base = new URL(url);
-        const hash = crypto.createHash('sha256').update(icon).digest('hex').slice(0, 10);
+        // 使用 Web Crypto API 代替 node:crypto 生成 hash
+        const encoder = new TextEncoder();
+        const hashBuffer = await crypto.subtle.digest('SHA-256', encoder.encode(icon));
+        const hashArray = Array.from(new Uint8Array(hashBuffer));
+        const hash = hashArray.map(b => b.toString(16).padStart(2, '0')).join('').slice(0, 10);
         const fileName = `${base.hostname.replace(/[:/]/g, '_')}_${hash}.${ext}`;
 
         console.log('R2 Config Check:', {

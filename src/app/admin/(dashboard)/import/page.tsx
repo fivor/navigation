@@ -9,7 +9,11 @@ export default function ImportExportPage() {
   const [file, setFile] = useState<File | null>(null);
   const [importType, setImportType] = useState<'chrome' | 'safari'>('chrome');
   const [isLoading, setIsLoading] = useState(false);
-  const [result, setResult] = useState<Record<string, unknown> | null>(null);
+  const [result, setResult] = useState<{
+    imported: number;
+    duplicates: number;
+    categories: any[];
+  } | null>(null);
   const [error, setError] = useState('');
   const [isExporting, setIsExporting] = useState(false);
 
