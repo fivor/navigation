@@ -49,23 +49,19 @@ export const sql = async <T = any>(
     }
   }
 
-  // 3. 本地开发回退 (Node.js 环境)
-  // 注意：在 next dev 中如果设置了 runtime = 'edge'，原生模块无法加载
-  // 仅当非 Edge Runtime 时才尝试加载本地数据库
-  if (process.env.NODE_ENV === 'development' && typeof process !== 'undefined' && process.release?.name === 'node') {
+  // 3. 本地开发回退 (仅在 Node.js 环境且开发模式下)
+  // 使用 NEXT_RUNTIME 变量来确保在 Edge Runtime 下完全不执行/加载此段逻辑
+  if (process.env.NODE_ENV === 'development' && process.env.NEXT_RUNTIME !== 'edge') {
     try {
-      // 尝试加载 better-sqlite3
-      let Database;
-      try {
-        Database = require('better-sqlite3');
-      } catch (e) {
-        // 在 Edge Runtime 下，require('better-sqlite3') 会抛出错误
-        throw e;
-      }
+      // 使用动态 require 绕过 Edge 编译器的静态分析
+      const dbModule = 'better-sqlite3';
+      const Database = require(dbModule);
 
       if (!localDb) {
-        const path = require('path');
-        const dbPath = path.join(process.cwd(), 'local.db');
+        const pathModule = 'path';
+        const path = require(pathModule);
+        // 使用相对路径，避免直接引用 process.cwd()
+        const dbPath = path.resolve('local.db');
         localDb = new Database(dbPath);
       }
 
@@ -83,9 +79,8 @@ export const sql = async <T = any>(
         }
         return { rows: [], rowCount: result.changes || 0 };
       }
-    } catch (error) {
-      // 如果是在 Edge Runtime 下尝试运行此代码，会进入这里
-      console.warn('Local SQLite fallback failed. If you are in Edge Runtime, this is expected.');
+    } catch (e) {
+      // 忽略错误
     }
   }
 

@@ -176,7 +176,7 @@ export async function POST(request: Request) {
       if (iconRes.ok) {
         const contentType = iconRes.headers.get('content-type') || '';
         const ab = await iconRes.arrayBuffer();
-        let buf = Buffer.from(ab);
+        const buf = new Uint8Array(ab);
         // Skip compression in Edge Runtime as sharp is not available
         let ext = 'png';
         if (contentType.includes('svg')) ext = 'svg';
