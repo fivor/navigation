@@ -1,19 +1,11 @@
 'use client';
 import { Category } from '@/types';
-import * as LucideIcons from 'lucide-react';
+import { IconRenderer } from '@/components/ui/IconRenderer';
 
 interface Props {
   categories: Category[];
   hasRecommended: boolean;
 }
-
-const IconRenderer = ({ iconName, className }: { iconName: string | null; className?: string }) => {
-  if (!iconName) return null;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const IconComponent = (LucideIcons as any)[iconName];
-  if (!IconComponent) return null;
-  return <IconComponent className={className} />;
-};
 
 export function CategoryNav({ categories, hasRecommended }: Props) {
   const handleScrollTo = (e: React.MouseEvent<HTMLAnchorElement>, selector: string) => {
@@ -32,7 +24,7 @@ export function CategoryNav({ categories, hasRecommended }: Props) {
           onClick={(e) => handleScrollTo(e, '#recommended')}
           className="flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium text-gray-300 hover:bg-[#2a2a2a] hover:text-white transition-all group"
         >
-          <LucideIcons.Star className="w-4 h-4 text-gray-500 group-hover:text-yellow-400 transition-colors" />
+          <IconRenderer iconName="Star" className="w-4 h-4 text-gray-500 group-hover:text-yellow-400 transition-colors" />
           常用推荐
         </a>
       )}

@@ -5,6 +5,7 @@ import NextLink from 'next/link';
 import Image from 'next/image';
 import { SearchBar } from '@/components/public/SearchBar';
 import { CategoryNav } from '@/components/public/CategoryNav';
+import { IconRenderer } from '@/components/ui/IconRenderer';
 import { unstable_cache } from 'next/cache';
 
 // Force dynamic rendering and use edge runtime for Cloudflare
@@ -48,16 +49,6 @@ async function getAllLinks(search?: string) {
   )();
   return cached;
 }
-
-import * as LucideIcons from 'lucide-react';
-
-const IconRenderer = ({ iconName, className }: { iconName: string | null; className?: string }) => {
-  if (!iconName) return null;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const IconComponent = (LucideIcons as any)[iconName];
-  if (!IconComponent) return null;
-  return <IconComponent className={className} />;
-};
 
 export default async function HomePage({
   searchParams,
