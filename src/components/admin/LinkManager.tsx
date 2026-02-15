@@ -9,7 +9,7 @@ import { useRouter } from 'next/navigation';
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent } from '@dnd-kit/core';
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { GripVertical } from 'lucide-react';
+import { IconRenderer } from '@/components/ui/IconRenderer';
 
 interface LinkManagerProps {
   initialLinks: (Link & { category_name: string })[];
@@ -37,7 +37,7 @@ function SortableRow({ link, onEdit, onDelete }: { link: Link & { category_name:
     <tr ref={setNodeRef} style={style} className={isDragging ? 'opacity-50 bg-gray-50 dark:bg-gray-700' : ''}>
       <td className="px-6 py-4 whitespace-nowrap">
         <button {...attributes} {...listeners} className="cursor-grab hover:text-gray-700 dark:hover:text-gray-300 text-gray-400">
-           <GripVertical className="w-5 h-5" />
+           <IconRenderer iconName="GripVertical" className="w-5 h-5" />
         </button>
       </td>
       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">{link.title}</td>

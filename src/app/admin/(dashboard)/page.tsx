@@ -1,5 +1,5 @@
 import { sql } from '@/lib/db';
-import { Link as LinkIcon, FolderTree, Star, Plus, Import, Download } from 'lucide-react';
+import { IconRenderer } from '@/components/ui/IconRenderer';
 import { getSession } from '@/lib/session';
 import Link from 'next/link';
 
@@ -51,7 +51,7 @@ export default async function AdminDashboardPage() {
             <div className="p-5">
               <div className="flex items-center">
                 <div className="flex-shrink-0 p-3 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
-                  <LinkIcon className="h-6 w-6 text-blue-600 dark:text-blue-400" aria-hidden="true" />
+                  <IconRenderer iconName="Link" className="h-6 w-6 text-blue-600 dark:text-blue-400" />
                 </div>
                 <div className="ml-5 w-0 flex-1">
                   <dl>
@@ -70,7 +70,7 @@ export default async function AdminDashboardPage() {
             <div className="p-5">
               <div className="flex items-center">
                 <div className="flex-shrink-0 p-3 bg-purple-100 dark:bg-purple-900/30 rounded-lg">
-                  <FolderTree className="h-6 w-6 text-purple-600 dark:text-purple-400" aria-hidden="true" />
+                  <IconRenderer iconName="FolderTree" className="h-6 w-6 text-purple-600 dark:text-purple-400" />
                 </div>
                 <div className="ml-5 w-0 flex-1">
                   <dl>
@@ -89,7 +89,7 @@ export default async function AdminDashboardPage() {
             <div className="p-5">
               <div className="flex items-center">
                 <div className="flex-shrink-0 p-3 bg-yellow-100 dark:bg-yellow-900/30 rounded-lg">
-                  <Star className="h-6 w-6 text-yellow-600 dark:text-yellow-400" aria-hidden="true" />
+                  <IconRenderer iconName="Star" className="h-6 w-6 text-yellow-600 dark:text-yellow-400" />
                 </div>
                 <div className="ml-5 w-0 flex-1">
                   <dl>
@@ -121,7 +121,7 @@ export default async function AdminDashboardPage() {
                       <img src={link.icon} alt="" className="h-8 w-8 rounded bg-gray-100 object-contain" />
                     ) : (
                       <div className="h-8 w-8 rounded bg-gray-100 dark:bg-gray-700 flex items-center justify-center">
-                        <LinkIcon className="h-4 w-4 text-gray-400" />
+                        <IconRenderer iconName="Link" className="h-4 w-4 text-gray-400" />
                       </div>
                     )}
                     <div className="flex-1 min-w-0">
@@ -155,28 +155,28 @@ export default async function AdminDashboardPage() {
                 href="/admin/links"
                 className="flex items-center p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors group"
               >
-                <Plus className="h-5 w-5 text-gray-400 group-hover:text-blue-500 mr-3" />
+                <IconRenderer iconName="Plus" className="h-5 w-5 text-gray-400 group-hover:text-blue-500 mr-3" />
                 <span className="text-sm font-medium text-gray-700 dark:text-gray-200 group-hover:text-blue-600">添加链接</span>
               </Link>
               <Link
                 href="/admin/categories"
                 className="flex items-center p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg hover:bg-purple-50 dark:hover:bg-purple-900/20 transition-colors group"
               >
-                <Plus className="h-5 w-5 text-gray-400 group-hover:text-purple-500 mr-3" />
+                <IconRenderer iconName="Plus" className="h-5 w-5 text-gray-400 group-hover:text-purple-500 mr-3" />
                 <span className="text-sm font-medium text-gray-700 dark:text-gray-200 group-hover:text-purple-600">管理分类</span>
               </Link>
               <Link
                 href="/admin/import"
                 className="flex items-center p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors group"
               >
-                <Plus className="h-5 w-5 text-gray-400 group-hover:text-blue-500 mr-3" />
+                <IconRenderer iconName="Plus" className="h-5 w-5 text-gray-400 group-hover:text-blue-500 mr-3" />
                 <span className="text-sm font-medium text-gray-700 dark:text-gray-200 group-hover:text-blue-600">批量导入</span>
               </Link>
               <Link
                 href="/admin/import"
                 className="flex items-center p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg hover:bg-green-50 dark:hover:bg-green-900/20 transition-colors group"
               >
-                <Download className="h-5 w-5 text-gray-400 group-hover:text-green-500 mr-3" />
+                <IconRenderer iconName="Download" className="h-5 w-5 text-gray-400 group-hover:text-green-500 mr-3" />
                 <span className="text-sm font-medium text-gray-700 dark:text-gray-200 group-hover:text-green-600">导出书签</span>
               </Link>
             </div>

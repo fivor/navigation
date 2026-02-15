@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Search, X, Loader2 } from 'lucide-react';
+import { IconRenderer } from '@/components/ui/IconRenderer';
 import { useDebounce } from '@/hooks/use-debounce';
 
 export function SearchBar() {
@@ -60,7 +60,7 @@ export function SearchBar() {
   return (
     <div className="relative w-full group">
       <div className="relative flex items-center">
-        <Search className="absolute left-3 w-4 h-4 text-gray-400 group-focus-within:text-blue-500 transition-colors" />
+        <IconRenderer iconName="Search" className="absolute left-3 w-4 h-4 text-gray-400 group-focus-within:text-blue-500 transition-colors" />
         <input
           ref={inputRef}
           type="text"
@@ -74,7 +74,7 @@ export function SearchBar() {
             onClick={handleClear}
             className="absolute right-3 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
           >
-            <X className="w-4 h-4" />
+            <IconRenderer iconName="X" className="w-4 h-4" />
           </button>
         )}
       </div>
@@ -90,12 +90,12 @@ export function SearchBar() {
                         href={`${engine.url}${encodeURIComponent(query)}`}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="flex-1 px-3 py-2 rounded bg-gray-50 dark:bg-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 text-center text-sm text-gray-700 dark:text-gray-200 transition-colors flex items-center justify-center gap-2"
-                     >
-                         <Search className="w-3 h-3" />
-                         {engine.name}
-                     </a>
-                 ))}
+                       className="flex-1 px-3 py-2 rounded bg-gray-50 dark:bg-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 text-center text-sm text-gray-700 dark:text-gray-200 transition-colors flex items-center justify-center gap-2"
+                    >
+                        <IconRenderer iconName="Search" className="w-3 h-3" />
+                        {engine.name}
+                    </a>
+                ))}
              </div>
          </div>
       )}

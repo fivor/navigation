@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
-import { CloudCog } from 'lucide-react';
+import { IconRenderer } from '@/components/ui/IconRenderer';
 
 export default function IconSettingsPage() {
   const [accessKeyId, setAccessKeyId] = useState('');
@@ -97,8 +97,8 @@ export default function IconSettingsPage() {
         
         <section className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
           <div className="flex items-center gap-2 mb-6">
-            <CloudCog className="w-5 h-5 text-purple-500" />
-            <h2 className="text-lg font-medium text-gray-900 dark:text-white">R2 对象存储配置</h2>
+            <IconRenderer iconName="CloudCog" className="w-5 h-5 text-purple-500" />
+            <h2 className="text-lg font-medium text-gray-900 dark:text-white">R2 存储配置</h2>
           </div>
           
           <form onSubmit={handleR2Save} className="grid grid-cols-1 md:grid-cols-2 gap-6">

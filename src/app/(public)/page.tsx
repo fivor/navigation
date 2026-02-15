@@ -1,6 +1,5 @@
 import { sql } from '@/lib/db';
 import { Category, Link } from '@/types';
-import { ExternalLink } from 'lucide-react';
 import NextLink from 'next/link';
 import Image from 'next/image';
 import { SearchBar } from '@/components/public/SearchBar';
@@ -140,7 +139,9 @@ export default async function HomePage({
                           {link.icon ? (
                             <img src={link.icon} alt="" className="w-8 h-8 object-cover" />
                           ) : (
-                            <ExternalLink className="w-4 h-4" />
+                            <div className="flex items-center justify-center w-full h-full bg-gray-100 dark:bg-gray-800 text-gray-400 group-hover:text-blue-500 transition-colors">
+                              <IconRenderer iconName="ExternalLink" className="w-4 h-4" />
+                            </div>
                           )}
                         </div>
                       </div>
@@ -198,7 +199,9 @@ export default async function HomePage({
                           {link.icon ? (
                             <img src={link.icon} alt="" className="w-8 h-8 object-cover" />
                           ) : (
-                            <ExternalLink className="w-4 h-4" />
+                            <div className="flex items-center justify-center w-full h-full bg-gray-100 dark:bg-gray-800 text-gray-400 group-hover:text-blue-500 transition-colors">
+                              <IconRenderer iconName="ExternalLink" className="w-4 h-4" />
+                            </div>
                           )}
                         </div>
                       </div>

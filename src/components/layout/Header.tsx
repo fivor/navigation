@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { ThemeToggle } from './ThemeToggle';
-import { Search, Menu, X, User } from 'lucide-react';
+import { IconRenderer } from '@/components/ui/IconRenderer';
 import { useState } from 'react';
 import { Dialog, DialogPanel } from '@headlessui/react';
 
@@ -31,7 +31,7 @@ export function Header({ user }: HeaderProps) {
             onClick={() => setMobileMenuOpen(true)}
           >
             <span className="sr-only">打开主菜单</span>
-            <Menu className="h-6 w-6" aria-hidden="true" />
+            <IconRenderer iconName="Menu" className="h-6 w-6" />
           </button>
         </div>
 
@@ -39,7 +39,7 @@ export function Header({ user }: HeaderProps) {
           {/* Search Bar could go here */}
           <div className="relative">
             <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-              <Search className="w-4 h-4 text-gray-500" />
+              <IconRenderer iconName="Search" className="w-4 h-4 text-gray-500" />
             </div>
             <input
               type="text"
@@ -53,7 +53,7 @@ export function Header({ user }: HeaderProps) {
           <ThemeToggle />
           {user ? (
              <Link href="/admin" className="flex items-center gap-2 text-sm font-semibold leading-6 text-gray-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400">
-                <User size={18} />
+                <IconRenderer iconName="User" className="w-[18px] h-[18px]" />
                 <span>管理后台</span>
              </Link>
           ) : (
@@ -77,7 +77,7 @@ export function Header({ user }: HeaderProps) {
               onClick={() => setMobileMenuOpen(false)}
             >
               <span className="sr-only">关闭菜单</span>
-              <X className="h-6 w-6" aria-hidden="true" />
+              <IconRenderer iconName="X" className="h-6 w-6" />
             </button>
           </div>
           <div className="mt-6 flow-root">

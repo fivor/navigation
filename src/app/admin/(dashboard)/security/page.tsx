@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
-import { Shield } from 'lucide-react';
+import { IconRenderer } from '@/components/ui/IconRenderer';
 import { useRouter } from 'next/navigation';
 
 export default function SecuritySettingsPage() {
@@ -60,7 +60,7 @@ export default function SecuritySettingsPage() {
         
         <section className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
           <div className="flex items-center gap-2 mb-6">
-            <Shield className="w-5 h-5 text-blue-500" />
+            <IconRenderer iconName="Shield" className="w-5 h-5 text-blue-500" />
             <h2 className="text-lg font-medium text-gray-900 dark:text-white">账号安全</h2>
           </div>
           

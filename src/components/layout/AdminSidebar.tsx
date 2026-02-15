@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
-import { LayoutDashboard, Link as LinkIcon, FolderTree, Upload, LogOut, Menu, X, Shield, CloudCog } from 'lucide-react';
+import { IconRenderer } from '@/components/ui/IconRenderer';
 import { Button } from '@/components/ui/Button';
 import { ThemeToggle } from './ThemeToggle';
 import { useState } from 'react';
@@ -15,12 +15,12 @@ export function AdminSidebar() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const navigation = [
-    { name: '仪表盘', href: '/admin', icon: LayoutDashboard },
-    { name: '链接管理', href: '/admin/links', icon: LinkIcon },
-    { name: '分类管理', href: '/admin/categories', icon: FolderTree },
-    { name: '导入导出', href: '/admin/import', icon: Upload },
-    { name: '安全设置', href: '/admin/security', icon: Shield },
-    { name: '图标设置', href: '/admin/icons', icon: CloudCog },
+    { name: '仪表盘', href: '/admin', icon: 'LayoutDashboard' },
+    { name: '链接管理', href: '/admin/links', icon: 'Link' },
+    { name: '分类管理', href: '/admin/categories', icon: 'FolderTree' },
+    { name: '导入导出', href: '/admin/import', icon: 'Upload' },
+    { name: '安全设置', href: '/admin/security', icon: 'Shield' },
+    { name: '图标设置', href: '/admin/icons', icon: 'CloudCog' },
   ];
 
   const handleLogout = async () => {
@@ -44,7 +44,7 @@ export function AdminSidebar() {
           </Link>
           <div className="flex items-center gap-2">
              <button onClick={() => setSidebarOpen(true)} className="p-2 text-gray-700 dark:text-gray-200">
-               <Menu className="w-6 h-6" />
+               <IconRenderer iconName="Menu" className="w-6 h-6" />
              </button>
           </div>
       </div>
@@ -60,7 +60,7 @@ export function AdminSidebar() {
                     <span className="font-bold text-xl dark:text-white font-handwriting">一个导航站</span>
                  </div>
                  <button onClick={() => setSidebarOpen(false)} className="text-gray-700 dark:text-gray-200">
-                   <X className="w-6 h-6" />
+                   <IconRenderer iconName="X" className="w-6 h-6" />
                  </button>
                </div>
                <nav className="flex flex-1 flex-col">
@@ -79,7 +79,7 @@ export function AdminSidebar() {
                                   : 'text-gray-700 hover:bg-gray-50 hover:text-blue-600 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-white'}
                               `}
                             >
-                              <item.icon className="h-6 w-6 shrink-0" aria-hidden="true" />
+                              <IconRenderer iconName={item.icon} className="h-6 w-6 shrink-0" />
                               {item.name}
                             </Link>
                           </li>
@@ -88,7 +88,7 @@ export function AdminSidebar() {
                     </li>
                     <li className="mt-auto">
                         <Button variant="ghost" className="w-full justify-start gap-x-3 text-red-600 hover:text-red-700 dark:text-red-400" onClick={handleLogout}>
-                            <LogOut className="h-6 w-6 shrink-0" />
+                            <IconRenderer iconName="LogOut" className="h-6 w-6 shrink-0" />
                             退出登录
                         </Button>
                     </li>
@@ -125,7 +125,7 @@ export function AdminSidebar() {
                             : 'text-gray-400 hover:bg-[#2a2a2a] hover:text-white'}
                         `}
                       >
-                        <item.icon className="h-6 w-6 shrink-0" aria-hidden="true" />
+                        <IconRenderer iconName={item.icon} className="h-6 w-6 shrink-0" />
                         {item.name}
                       </Link>
                     </li>
@@ -134,7 +134,7 @@ export function AdminSidebar() {
               </li>
               <li className="mt-auto">
                  <Button variant="ghost" className="w-full justify-start gap-x-3 text-red-400 hover:text-red-300 hover:bg-[#2a2a2a]" onClick={handleLogout}>
-                    <LogOut className="h-6 w-6 shrink-0" />
+                    <IconRenderer iconName="LogOut" className="h-6 w-6 shrink-0" />
                     退出登录
                  </Button>
               </li>

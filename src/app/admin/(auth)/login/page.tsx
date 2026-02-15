@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
-import { ShieldCheck } from 'lucide-react';
+import { IconRenderer } from '@/components/ui/IconRenderer';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -57,7 +57,7 @@ export default function LoginPage() {
         <div className="bg-white/90 dark:bg-gray-800/90 backdrop-blur-md shadow-2xl rounded-2xl p-8 border border-white/20 dark:border-gray-700/50">
             <div className="flex flex-col items-center mb-8">
                 <div className="w-16 h-16 bg-blue-50/80 dark:bg-blue-900/50 rounded-full flex items-center justify-center mb-4 backdrop-blur-sm">
-                    <ShieldCheck className="w-8 h-8 text-blue-600 dark:text-blue-400" />
+                    <IconRenderer iconName="ShieldCheck" className="w-8 h-8 text-blue-600 dark:text-blue-400" />
                 </div>
                 <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
                 欢迎回来

@@ -1,7 +1,7 @@
 'use client';
 
 import { useTheme } from 'next-themes';
-import { Moon, Sun } from 'lucide-react';
+import { IconRenderer } from '@/components/ui/IconRenderer';
 import { useEffect, useState } from 'react';
 
 export function ThemeToggle() {
@@ -23,7 +23,7 @@ export function ThemeToggle() {
       className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
       aria-label="切换主题"
     >
-      {theme === 'dark' ? <Sun size={20} /> : <Moon size={20} />}
+      {theme === 'dark' ? <IconRenderer iconName="Sun" className="w-5 h-5" /> : <IconRenderer iconName="Moon" className="w-5 h-5" />}
     </button>
   );
 }
