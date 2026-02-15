@@ -16,8 +16,17 @@ const nextConfig: NextConfig = {
       'better-sqlite3': './empty-module.js',
       'sharp': './empty-module.js',
       'cheerio': './empty-module.js',
-      'bcryptjs': './empty-module.js',
     },
+  },
+  webpack: (config) => {
+    // 强制忽略 Node.js 专有模块，防止被打包进 Edge Worker
+    config.resolve.alias = {
+      ...config.resolve.alias,
+      'better-sqlite3': false,
+      'sharp': false,
+      'cheerio': false,
+    };
+    return config;
   },
 };
 
