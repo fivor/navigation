@@ -9,11 +9,11 @@ const nextConfig: NextConfig = {
   images: {
     unoptimized: true, // 禁用图片优化，减少 sharp 依赖的潜在打包体积
   },
-  webpack: (config, { isServer }) => {
-    if (isServer) {
-      config.externals.push('better-sqlite3', 'sharp');
-    }
-    return config;
+  turbopack: {
+    resolveAlias: {
+      'better-sqlite3': './empty-module.js',
+      'sharp': './empty-module.js',
+    },
   },
 };
 
