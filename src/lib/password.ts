@@ -83,15 +83,15 @@ export async function comparePassword(password: string, storedHash: string): Pro
     );
     
     const derivedBits = await crypto.subtle.deriveBits(
-      {
-        name: "PBKDF2",
-        salt: salt,
-        iterations: iterations,
-        hash: "SHA-256",
-      },
-      keyMaterial,
-      KEY_LENGTH * 8
-    );
+    {
+      name: "PBKDF2",
+      salt: salt as unknown as BufferSource,
+      iterations: iterations,
+      hash: "SHA-256",
+    },
+    keyMaterial,
+    KEY_LENGTH * 8
+  );
     
     const derivedHashHex = bufferToHex(derivedBits);
     
