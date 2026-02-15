@@ -2,8 +2,6 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { verifyToken } from './lib/auth';
 
-export const runtime = 'edge';
-
 export async function proxy(request: NextRequest) {
   const path = request.nextUrl.pathname;
   
