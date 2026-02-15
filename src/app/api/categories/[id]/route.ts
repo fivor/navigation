@@ -4,7 +4,7 @@ import { getSession } from '@/lib/session';
 import { Category } from '@/types';
 import { revalidatePath } from 'next/cache';
 
-export const runtime = 'edge';
+export const runtime = 'experimental-edge';
 
 export async function PUT(
   request: Request,

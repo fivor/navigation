@@ -3,7 +3,7 @@ import { sql } from '@/lib/db';
 import { getSession } from '@/lib/session';
 import { Link, Category } from '@/types';
 
-export const runtime = 'edge';
+export const runtime = 'experimental-edge';
 
 export async function GET(request: Request) {
   try {

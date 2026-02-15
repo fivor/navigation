@@ -2,9 +2,9 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { verifyToken } from './lib/auth';
 
-export const runtime = 'edge';
+export const runtime = 'experimental-edge';
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const path = request.nextUrl.pathname;
   
   // Define public paths that don't require authentication

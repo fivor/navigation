@@ -9,7 +9,7 @@ import { unstable_cache } from 'next/cache';
 
 // Force dynamic rendering and use edge runtime for Cloudflare
 export const dynamic = 'force-dynamic';
-export const runtime = 'edge';
+export const runtime = 'experimental-edge';
 
 const getCategoriesCached = unstable_cache(
   async () => {

@@ -5,7 +5,7 @@ import { comparePassword, hashPassword } from '@/lib/password';
 import { cookies } from 'next/headers';
 import { z } from 'zod';
 
-export const runtime = 'edge';
+export const runtime = 'experimental-edge';
 
 const Schema = z.object({
   currentPassword: z.string().min(5).max(128),

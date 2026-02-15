@@ -5,7 +5,7 @@ import { Link } from '@/types';
 import { z } from 'zod';
 import { revalidatePath } from 'next/cache';
 
-export const runtime = 'edge';
+export const runtime = 'experimental-edge';
 
 export async function PUT(
   request: Request,

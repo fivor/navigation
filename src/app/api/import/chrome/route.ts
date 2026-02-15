@@ -3,7 +3,7 @@ import { sql } from '@/lib/db';
 import { getSession } from '@/lib/session';
 import * as cheerio from 'cheerio';
 
-export const runtime = 'edge';
+export const runtime = 'experimental-edge';
 
 export async function POST(request: Request) {
   try {
