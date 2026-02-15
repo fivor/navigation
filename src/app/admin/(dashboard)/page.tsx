@@ -5,7 +5,7 @@ import Link from 'next/link';
 
 // Force dynamic rendering
 export const dynamic = 'force-dynamic';
-export const runtime = 'experimental-edge';
+export const runtime = 'edge';
 
 async function getStats() {
   try {

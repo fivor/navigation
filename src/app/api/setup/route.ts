@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { sql } from '@/lib/db';
 import { hashPassword } from '@/lib/password';
 
-export const runtime = 'experimental-edge'; // D1 必须在 Edge Runtime 下运行
+export const runtime = 'edge'; // D1 必须在 Edge Runtime 下运行
 
 export async function GET(request: Request) {
   try {

@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getSession } from '@/lib/session';
 
-export const runtime = 'experimental-edge';
+export const runtime = 'edge';
 
 export async function POST() {
   try {

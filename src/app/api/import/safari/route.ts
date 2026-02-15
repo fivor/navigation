@@ -3,7 +3,7 @@ import { sql } from '@/lib/db';
 import { getSession } from '@/lib/session';
 import plist from 'plist';
 
-export const runtime = 'experimental-edge';
+export const runtime = 'edge';
 
 export async function POST(request: Request) {
   try {

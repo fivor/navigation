@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/session';
 import { revalidatePath } from 'next/cache';
 
-export const runtime = 'experimental-edge';
+export const runtime = 'edge';
 
 // Handle PUT request for reordering links
 export async function PUT(req: NextRequest) {

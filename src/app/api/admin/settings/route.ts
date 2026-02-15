@@ -3,7 +3,7 @@ import { getSession } from '@/lib/session';
 import { upsertR2Config, getR2Config } from '@/lib/settings';
 import { z } from 'zod';
 
-export const runtime = 'experimental-edge';
+export const runtime = 'edge';
 
 const Schema = z.object({
   accessKeyId: z.string().min(1).optional().or(z.literal('')),

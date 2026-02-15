@@ -6,7 +6,7 @@ import { signToken } from '@/lib/auth';
 import { User } from '@/types';
 import { z } from 'zod';
 
-export const runtime = 'experimental-edge';
+export const runtime = 'edge';
 
 // Extend User type to include password_hash for internal use
 interface DBUser extends User {

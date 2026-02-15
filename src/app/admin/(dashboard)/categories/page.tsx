@@ -5,7 +5,7 @@ import { getSession } from '@/lib/session';
 
 // Force dynamic rendering and use edge runtime
 export const dynamic = 'force-dynamic';
-export const runtime = 'experimental-edge';
+export const runtime = 'edge';
 
 async function getCategories() {
   try {

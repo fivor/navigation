@@ -4,7 +4,7 @@ import { getSession } from '@/lib/session';
 import { getR2Config } from '@/lib/settings';
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
 
-export const runtime = 'experimental-edge';
+export const runtime = 'edge';
 
 export async function POST(request: Request) {
   try {
