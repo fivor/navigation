@@ -54,12 +54,13 @@ export const sql = async <T = any>(
   if (process.env.NODE_ENV === 'development' && process.env.NEXT_RUNTIME !== 'edge') {
     try {
       // 使用动态 require 绕过 Edge 编译器的静态分析
+      // 使用 module.require 确保 webpack 不会处理它
       const dbModule = 'better-sqlite3';
-      const Database = require(dbModule);
+      const Database = module.require(dbModule);
 
       if (!localDb) {
         const pathModule = 'path';
-        const path = require(pathModule);
+        const path = module.require(pathModule);
         // 使用相对路径，避免直接引用 process.cwd()
         const dbPath = path.resolve('local.db');
         localDb = new Database(dbPath);
