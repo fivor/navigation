@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import * as cheerio from 'cheerio';
 import { getSession } from '@/lib/session';
 import { getR2Config } from '@/lib/settings';
-import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
+import { uploadToR2 } from '@/lib/r2';
 
 export const runtime = 'edge';
 
@@ -203,19 +203,17 @@ export async function POST(request: Request) {
           try {
             console.log('Attempting R2 Upload...');
             
-            const s3 = new S3Client({
-              region: 'auto',
-              endpoint: r2Endpoint,
-              credentials: { accessKeyId: r2AccessKey, secretAccessKey: r2Secret },
-            });
             const key = `site-icons/${fileName}`;
-            await s3.send(new PutObjectCommand({
-              Bucket: r2Bucket,
-              Key: key,
-              Body: buf,
-              ContentType: contentType || 'application/octet-stream',
-              CacheControl: 'public, max-age=31536000, immutable',
-            }));
+            await uploadToR2({
+              bucket: r2Bucket,
+              key: key,
+              body: buf,
+              contentType: contentType || 'application/octet-stream',
+              endpoint: r2Endpoint,
+              accessKeyId: r2AccessKey,
+              secretAccessKey: r2Secret,
+            });
+            
             localIcon = `${r2PublicBase.replace(/\/+$/,'')}/${key}`;
             console.log('R2 Upload Success:', localIcon);
           } catch (r2Err: any) {
