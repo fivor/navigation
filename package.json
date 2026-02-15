@@ -15,7 +15,6 @@
     "@dnd-kit/utilities": "^3.2.2",
     "@headlessui/react": "^2.2.9",
     "bcryptjs": "^3.0.3",
-    "cheerio": "^1.2.0",
     "clsx": "^2.1.1",
     "cookie": "^1.1.1",
     "date-fns": "^4.1.0",

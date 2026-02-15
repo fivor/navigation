@@ -1,10 +1,73 @@
 import { NextResponse } from 'next/server';
-import * as cheerio from 'cheerio';
 import { getSession } from '@/lib/session';
 import { getR2Config } from '@/lib/settings';
 import { uploadToR2 } from '@/lib/r2';
 
 export const runtime = 'edge';
+
+function extractMetadata(html: string) {
+  const titleMatch = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
+  const title = titleMatch ? titleMatch[1].trim() : '';
+
+  const getMetaTag = (nameOrProperty: string) => {
+    const regex = new RegExp(`<meta[^>]*(?:name|property)=["']${nameOrProperty}["'][^>]*content=["']([^"']*)["']`, 'i');
+    const match = html.match(regex);
+    if (match) return match[1];
+    
+    // Try reverse order: content then name/property
+    const regexRev = new RegExp(`<meta[^>]*content=["']([^"']*)["'][^>]*(?:name|property)=["']${nameOrProperty}["']`, 'i');
+    const matchRev = html.match(regexRev);
+    return matchRev ? matchRev[1] : '';
+  };
+
+  const description = getMetaTag('description') || getMetaTag('og:description') || '';
+  const ogTitle = getMetaTag('og:title') || '';
+  const ogImage = getMetaTag('og:image') || '';
+
+  // Extract icons
+  const icons: { href: string; sizeScore: number; priority: number }[] = [];
+  const linkRegex = /<link[^>]*rel=["']([^"']*)["'][^>]*>/gi;
+  let match;
+  while ((match = linkRegex.exec(html)) !== null) {
+    const fullTag = match[0];
+    const rel = match[1].toLowerCase();
+    
+    if (rel.includes('icon')) {
+      const hrefMatch = fullTag.match(/href=["']([^"']*)["']/i);
+      const sizesMatch = fullTag.match(/sizes=["']([^"']*)["']/i);
+      
+      if (hrefMatch) {
+        const href = hrefMatch[1];
+        const sizes = sizesMatch ? sizesMatch[1] : '';
+        let sizeScore = 48;
+        
+        const sMatch = sizes.match(/(\d+)\s*x\s*(\d+)/i);
+        if (sMatch) {
+          sizeScore = Math.max(parseInt(sMatch[1]), parseInt(sMatch[2]));
+        } else if (/apple-touch-icon/i.test(rel)) {
+          sizeScore = 180;
+        } else if (href.toLowerCase().endsWith('.ico')) {
+          sizeScore = 64;
+        }
+        
+        const priority = rel.includes('apple-touch-icon') ? 3 : rel.includes('shortcut') ? 1 : 2;
+        icons.push({ href, sizeScore, priority });
+      }
+    }
+  }
+
+  if (ogImage) {
+    icons.push({ href: ogImage, sizeScore: 300, priority: 0 });
+  }
+
+  icons.sort((a, b) => b.sizeScore - a.sizeScore || b.priority - a.priority);
+
+  return {
+    title: title || ogTitle,
+    description,
+    icon: icons.length > 0 ? icons[0].href : ''
+  };
+}
 
 export async function POST(request: Request) {
   try {
@@ -49,7 +112,6 @@ export async function POST(request: Request) {
     }
 
     // Try to fetch the URL
-    // Set a timeout
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 5000);
 
@@ -66,71 +128,19 @@ export async function POST(request: Request) {
     }
 
     const html = await response.text();
-    const $ = cheerio.load(html);
+    const metadata = extractMetadata(html);
 
-    // Extract title
-    const title = $('title').text() || $('meta[property="og:title"]').attr('content') || '';
-    
-    // Extract description
-    const description = $('meta[name="description"]').attr('content') || $('meta[property="og:description"]').attr('content') || '';
-
-    // Extract best favicon (prefer highest resolution)
-    let icon = '';
-    type IconCandidate = { href: string; sizeScore: number; priority: number };
-    const candidates: IconCandidate[] = [];
-
-    $('link[rel~="icon"], link[rel="shortcut icon"], link[rel="apple-touch-icon"], link[rel="apple-touch-icon-precomposed"]').each((_, el) => {
-      const href = $(el).attr('href') || '';
-      if (!href) return;
-      const sizes = $(el).attr('sizes') || '';
-      let sizeScore = 0;
-      const match = sizes.match(/(\d+)\s*x\s*(\d+)/i);
-      if (match) {
-        const w = parseInt(match[1], 10);
-        const h = parseInt(match[2], 10);
-        sizeScore = Math.max(w, h);
-      } else {
-        // Heuristic: filename hints
-        if (/(\d{2,4})\.png$/i.test(href)) {
-          sizeScore = parseInt(RegExp.$1, 10);
-        } else if (/apple-touch-icon/i.test(href)) {
-          sizeScore = 180;
-        } else if (/favicon\.ico$/i.test(href)) {
-          sizeScore = 64;
-        } else {
-          sizeScore = 48;
-        }
-      }
-      const rel = ($(el).attr('rel') || '').toLowerCase();
-      const priority = rel.includes('apple-touch-icon') ? 3 : rel.includes('icon') ? 2 : 1;
-      candidates.push({ href, sizeScore, priority });
-    });
-
-    // Also consider og:image but with lower priority as it can be large photos
-    const ogImage = $('meta[property="og:image"]').attr('content');
-    if (ogImage) {
-      candidates.push({ href: ogImage, sizeScore: 300, priority: 0 });
-    }
-
-    candidates.sort((a, b) => b.sizeScore - a.sizeScore || b.priority - a.priority);
-    if (candidates.length > 0) {
-      icon = candidates[0].href;
-    }
+    let title = metadata.title;
+    let description = metadata.description;
+    let icon = metadata.icon;
 
     // Resolve relative URLs
     if (icon && !icon.startsWith('http')) {
         try {
             const baseUrl = new URL(url);
-            // Handle absolute path /icon.png or relative path icon.png
-            if (icon.startsWith('/')) {
-                icon = `${baseUrl.origin}${icon}`;
-            } else {
-                // Determine base path from URL if it has path
-                // Simple join
-                icon = new URL(icon, baseUrl.href).href;
-            }
+            icon = new URL(icon, baseUrl.href).href;
         } catch {
-            // Ignore invalid URL construction
+            // Ignore
         }
     }
 
@@ -138,7 +148,6 @@ export async function POST(request: Request) {
     if (!icon) {
         try {
             const baseUrl = new URL(url);
-            // Prefer high-res via Google s2 as last fallback
             icon = `https://www.google.com/s2/favicons?sz=128&domain=${baseUrl.hostname}`;
         } catch {
             // Fallback
@@ -150,59 +159,38 @@ export async function POST(request: Request) {
     let r2Error = null;
 
     try {
-      // Load R2 config (DB overrides env)
       const dbCfg = await getR2Config(userId);
-      console.log('Database R2 Config:', {
-        hasCfg: !!dbCfg,
-        hasAccessKey: !!dbCfg?.accessKeyId,
-        hasSecret: !!dbCfg?.secretAccessKey,
-        hasBucket: !!dbCfg?.bucket,
-        hasEndpoint: !!dbCfg?.endpoint,
-        hasPublicBase: !!dbCfg?.publicBase,
-      });
-
       const r2AccessKey = dbCfg?.accessKeyId || process.env.R2_ACCESS_KEY_ID;
       const r2Secret = dbCfg?.secretAccessKey || process.env.R2_SECRET_ACCESS_KEY;
       const r2Bucket = dbCfg?.bucket || process.env.R2_BUCKET;
       const r2Endpoint = dbCfg?.endpoint || process.env.R2_ENDPOINT;
       const r2PublicBase = dbCfg?.publicBase || process.env.R2_PUBLIC_BASE;
-      const iconMaxKB = dbCfg?.iconMaxKB ?? 128;
-      const iconMaxSize = dbCfg?.iconMaxSize ?? 128;
 
       const ctrl = new AbortController();
       const tId = setTimeout(() => ctrl.abort(), 5000);
       const iconRes = await fetch(icon, { signal: ctrl.signal });
       clearTimeout(tId);
+      
       if (iconRes.ok) {
         const contentType = iconRes.headers.get('content-type') || '';
         const ab = await iconRes.arrayBuffer();
         const buf = new Uint8Array(ab);
-        // Skip compression in Edge Runtime as sharp is not available
+        
         let ext = 'png';
         if (contentType.includes('svg')) ext = 'svg';
         else if (contentType.includes('x-icon') || contentType.includes('vnd.microsoft.icon') || icon.toLowerCase().endsWith('.ico')) ext = 'ico';
         else if (contentType.includes('jpeg') || icon.toLowerCase().endsWith('.jpg') || icon.toLowerCase().endsWith('.jpeg')) ext = 'jpg';
         else if (contentType.includes('webp') || icon.toLowerCase().endsWith('.webp')) ext = 'webp';
+        
         const base = new URL(url);
-        // 使用 Web Crypto API 代替 node:crypto 生成 hash
         const encoder = new TextEncoder();
         const hashBuffer = await crypto.subtle.digest('SHA-256', encoder.encode(icon));
         const hashArray = Array.from(new Uint8Array(hashBuffer));
         const hash = hashArray.map(b => b.toString(16).padStart(2, '0')).join('').slice(0, 10);
         const fileName = `${base.hostname.replace(/[:/]/g, '_')}_${hash}.${ext}`;
 
-        console.log('R2 Config Check:', {
-          hasAccessKey: !!r2AccessKey,
-          hasSecret: !!r2Secret,
-          hasBucket: !!r2Bucket,
-          hasEndpoint: !!r2Endpoint,
-          hasPublicBase: !!r2PublicBase,
-        });
-
         if (r2AccessKey && r2Secret && r2Bucket && r2Endpoint && r2PublicBase) {
           try {
-            console.log('Attempting R2 Upload...');
-            
             const key = `site-icons/${fileName}`;
             await uploadToR2({
               bucket: r2Bucket,
@@ -215,14 +203,10 @@ export async function POST(request: Request) {
             });
             
             localIcon = `${r2PublicBase.replace(/\/+$/,'')}/${key}`;
-            console.log('R2 Upload Success:', localIcon);
           } catch (r2Err: any) {
             console.error('R2 Upload Failed:', r2Err);
             r2Error = r2Err?.message || String(r2Err);
           }
-        } else {
-          console.log('R2 not configured or incomplete, skipping upload');
-          r2Error = 'R2 not configured or incomplete';
         }
       }
     } catch (err: any) {
@@ -242,7 +226,6 @@ export async function POST(request: Request) {
 
   } catch (error) {
     console.error('Fetch metadata error:', error);
-    // Return empty success to allow manual entry without blocking
     return NextResponse.json({ success: false, message: 'Failed to fetch metadata' });
   }
 }
