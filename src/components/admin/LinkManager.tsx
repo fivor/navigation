@@ -12,8 +12,8 @@ import { CSS } from '@dnd-kit/utilities';
 import { IconRenderer } from '@/components/ui/IconRenderer';
 
 interface LinkManagerProps {
-  initialLinks: (Link & { category_name: string })[];
-  categories: Category[];
+  initialLinks?: (Link & { category_name: string })[];
+  categories?: Category[];
 }
 
 function SortableRow({ link, onEdit, onDelete }: { link: Link & { category_name: string }, onEdit: (link: Link) => void, onDelete: (id: number) => void }) {
@@ -55,9 +55,40 @@ function SortableRow({ link, onEdit, onDelete }: { link: Link & { category_name:
   );
 }
 
-export function LinkManager({ initialLinks, categories }: LinkManagerProps) {
+export function LinkManager({
+  initialLinks = [],
+  categories: initialCategories = []
+}: LinkManagerProps) {
   const router = useRouter();
   const [links, setLinks] = useState(initialLinks);
+  const [categories, setCategories] = useState(initialCategories);
+
+  useEffect(() => {
+    if (initialLinks.length === 0) {
+      fetch('/api/links')
+        .then(res => res.json())
+        .then(res => {
+           if(res.success && res.data) setLinks(res.data);
+        })
+        .catch(err => console.error('Failed to load links', err));
+    } else {
+        setLinks(initialLinks);
+    }
+  }, [initialLinks]);
+
+  useEffect(() => {
+    if (initialCategories.length === 0) {
+      fetch('/api/categories')
+        .then(res => res.json())
+        .then(res => {
+           if(res.success && res.data) setCategories(res.data);
+        })
+        .catch(err => console.error('Failed to load categories', err));
+    } else {
+        setCategories(initialCategories);
+    }
+  }, [initialCategories]);
+
   const [isOpen, setIsOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [isLoading, setIsLoading] = useState(false);

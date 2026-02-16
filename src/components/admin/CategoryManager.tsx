@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { IconPicker } from '@/components/ui/IconPicker';
@@ -9,12 +9,25 @@ import { Category } from '@/types';
 import { useRouter } from 'next/navigation';
 
 interface CategoryManagerProps {
-  initialCategories: (Category & { parent_name: string; links_count: number })[];
+  initialCategories?: (Category & { parent_name: string; links_count: number })[];
 }
 
-export function CategoryManager({ initialCategories }: CategoryManagerProps) {
+export function CategoryManager({ initialCategories = [] }: CategoryManagerProps) {
   const router = useRouter();
   const [categories, setCategories] = useState(initialCategories);
+  
+  useEffect(() => {
+    if (initialCategories.length === 0) {
+      fetch('/api/categories')
+        .then(res => res.json())
+        .then(res => {
+          if (res.success && res.data) {
+            setCategories(res.data);
+          }
+        })
+        .catch(err => console.error('Failed to load categories', err));
+    }
+  }, [initialCategories.length]);
   const [isOpen, setIsOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
