@@ -17,6 +17,12 @@ export function CategoryManager({ initialCategories = [] }: CategoryManagerProps
   const [categories, setCategories] = useState(initialCategories);
   
   useEffect(() => {
+    // If initialCategories is provided (e.g. from SSR or after router.refresh()), update state
+    setCategories(initialCategories);
+  }, [initialCategories]);
+  
+  // Only fetch if initialCategories is empty on mount (SPA navigation to this page)
+  useEffect(() => {
     if (initialCategories.length === 0) {
       fetch('/api/categories')
         .then(res => res.json())
@@ -27,7 +33,7 @@ export function CategoryManager({ initialCategories = [] }: CategoryManagerProps
         })
         .catch(err => console.error('Failed to load categories', err));
     }
-  }, [initialCategories.length]);
+  }, []); // Run once on mount if empty
   const [isOpen, setIsOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -68,8 +74,10 @@ export function CategoryManager({ initialCategories = [] }: CategoryManagerProps
 
       if (res.ok) {
         setIsOpen(false);
+        const data = await res.json();
+        // Optimistic update or wait for router.refresh
+        // If we rely on router.refresh(), it will update initialCategories which will update categories state via useEffect
         router.refresh();
-        window.location.reload(); 
       } else {
         const data = await res.json();
         alert(data.message || '操作失败');
@@ -89,7 +97,6 @@ export function CategoryManager({ initialCategories = [] }: CategoryManagerProps
         const res = await fetch(`/api/categories/${id}`, { method: 'DELETE' });
         if (res.ok) {
             router.refresh();
-            window.location.reload();
         } else {
             const data = await res.json();
             alert(data.message || '删除失败');

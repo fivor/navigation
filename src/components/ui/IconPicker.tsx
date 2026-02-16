@@ -59,8 +59,8 @@ export function IconPicker({ value, onChange }: IconPickerProps) {
               <button
                 key={icon}
                 type="button"
-                className={`flex h-8 w-8 items-center justify-center rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors ${
-                  value === icon ? 'bg-gray-200 dark:bg-gray-600' : ''
+                className={`flex h-8 w-8 items-center justify-center rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-gray-700 dark:text-gray-200 ${
+                  value === icon ? 'bg-gray-200 dark:bg-gray-600 text-blue-600 dark:text-blue-400' : ''
                 }`}
                 onClick={() => {
                   onChange(icon);

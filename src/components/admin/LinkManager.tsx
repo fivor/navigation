@@ -142,7 +142,10 @@ export function LinkManager({
     setIsOpen(true);
   };
 
+  const [isFetchingMetadata, setIsFetchingMetadata] = useState(false);
+
   const fetchMetadata = async (url: string) => {
+      setIsFetchingMetadata(true);
       try {
           const res = await fetch(`/api/fetch-metadata?url=${encodeURIComponent(url)}`, {
               method: 'POST'
@@ -171,6 +174,8 @@ export function LinkManager({
           }
       } catch (e) {
           console.error('Failed to fetch metadata', e);
+      } finally {
+          setIsFetchingMetadata(false);
       }
   };
 
@@ -402,6 +407,7 @@ export function LinkManager({
                 onChange={e => setCurrentLink({ ...currentLink, url: e.target.value })}
                 onBlur={handleUrlBlur}
               />
+              {isFetchingMetadata && <p className="text-xs text-blue-500">正在自动获取标题和图标...</p>}
               <Input
                 label="描述"
                 value={currentLink.description || ''}
@@ -432,7 +438,7 @@ export function LinkManager({
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">分类</label>
                 <select
-                  className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm dark:bg-gray-800 dark:border-gray-700 dark:text-white p-2"
+                  className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm text-gray-900 dark:bg-gray-800 dark:border-gray-700 dark:text-white p-2"
                   value={currentLink.category_id || ''}
                   onChange={e => setCurrentLink({ ...currentLink, category_id: Number(e.target.value) })}
                   required
@@ -445,8 +451,8 @@ export function LinkManager({
               </div>
               
               <div className="flex justify-end gap-2 mt-6">
-                <Button type="button" variant="ghost" onClick={() => setIsOpen(false)}>取消</Button>
-                <Button type="submit" isLoading={isLoading}>保存</Button>
+                <Button type="button" variant="ghost" onClick={() => setIsOpen(false)} className="text-gray-900 dark:text-white">取消</Button>
+                <Button type="submit" isLoading={isLoading || isFetchingMetadata}>保存</Button>
               </div>
             </form>
           </DialogPanel>

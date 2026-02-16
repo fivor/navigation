@@ -103,6 +103,49 @@ export function DashboardStats() {
             </div>
           </div>
         </div>
+
+        {/* Recent Links */}
+        <div className="bg-white dark:bg-gray-800 shadow sm:rounded-lg overflow-hidden">
+            <div className="px-4 py-5 sm:px-6 border-b border-gray-200 dark:border-gray-700">
+                <h3 className="text-lg leading-6 font-medium text-gray-900 dark:text-white">
+                    最近添加的链接
+                </h3>
+            </div>
+            <ul role="list" className="divide-y divide-gray-200 dark:divide-gray-700">
+                {stats.recentLinks.length > 0 ? (
+                    stats.recentLinks.map((link) => (
+                        <li key={link.id} className="px-4 py-4 sm:px-6 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+                            <div className="flex items-center justify-between">
+                                <div className="flex items-center truncate">
+                                    <div className="flex-shrink-0">
+                                        {link.icon ? (
+                                             <img src={link.icon} alt="" className="h-8 w-8 rounded bg-gray-100 dark:bg-gray-600" />
+                                        ) : (
+                                            <div className="h-8 w-8 rounded bg-gray-100 dark:bg-gray-600 flex items-center justify-center">
+                                                <IconRenderer iconName="Link" className="h-4 w-4 text-gray-500" />
+                                            </div>
+                                        )}
+                                    </div>
+                                    <div className="ml-4 truncate">
+                                        <p className="text-sm font-medium text-blue-600 dark:text-blue-400 truncate">{link.title}</p>
+                                        <p className="text-sm text-gray-500 dark:text-gray-400 truncate">{link.url}</p>
+                                    </div>
+                                </div>
+                                <div className="ml-2 flex-shrink-0 flex flex-col items-end">
+                                    <p className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
+                                        {new Date(link.created_at).toLocaleDateString()}
+                                    </p>
+                                </div>
+                            </div>
+                        </li>
+                    ))
+                ) : (
+                    <li className="px-4 py-8 text-center text-gray-500 dark:text-gray-400">
+                        暂无数据
+                    </li>
+                )}
+            </ul>
+        </div>
       </div>
     </div>
   );

@@ -70,7 +70,7 @@ export function HomeClient() {
     <div className="flex min-h-screen">
       {/* Left Sidebar - Full height, fixed */}
       <aside 
-        className="w-64 flex-shrink-0 bg-[#27272a] text-white fixed top-0 bottom-0 left-0 overflow-y-auto z-40 flex flex-col transition-colors duration-300 border-r border-gray-800"
+        className="w-64 flex-shrink-0 bg-[#333338] text-white fixed top-0 bottom-0 left-0 overflow-y-auto z-40 flex flex-col transition-colors duration-300 border-r border-gray-800"
       >
         <div className="p-6">
             <div className="flex items-center gap-3 mb-8">

@@ -92,6 +92,13 @@ export const linksHandlers = {
       return NextResponse.json({ success: true, data: result.rows[0] });
     } catch (error: any) {
       console.error('Create link error:', error);
+      // Handle SQLite unique constraint error
+      if (error.message && error.message.includes('UNIQUE constraint failed')) {
+         return NextResponse.json(
+          { success: false, message: '该链接已存在，请勿重复添加' },
+          { status: 409 }
+        );
+      }
       return NextResponse.json(
         { success: false, message: error.message || 'Failed to create link' },
         { status: 500 }
