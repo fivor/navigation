@@ -50,7 +50,9 @@ export const sql = async <T = any>(
   }
 
   // 3. 本地开发回退 (仅在 Node.js 环境且开发模式下)
-  // 使用 NEXT_RUNTIME 变量来确保在 Edge Runtime 下完全不执行/加载此段逻辑
+  // 为减少 Cloudflare Worker 打包体积，暂时禁用本地 SQLite 回退
+  // 请使用 `wrangler pages dev` 进行本地 D1 开发调试
+  /*
   if (process.env.NODE_ENV === 'development' && process.env.NEXT_RUNTIME !== 'edge') {
     try {
       // 使用动态 require 绕过 Edge 编译器的静态分析
@@ -84,7 +86,8 @@ export const sql = async <T = any>(
       // 忽略错误
     }
   }
+  */
 
   console.error('D1 Database binding "DB" not found.');
-  throw new Error('D1 Database not bound. If you are developing locally, please ensure you are not using Edge Runtime for local testing with SQLite, or use "wrangler pages dev" which supports D1 bindings.');
+  throw new Error('D1 Database not bound. If you are developing locally, please use "wrangler pages dev" which supports D1 bindings.');
 };

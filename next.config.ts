@@ -3,7 +3,7 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   reactCompiler: true,
   productionBrowserSourceMaps: false, // 禁用生产环境 Source Maps 以减小体积
-  serverExternalPackages: ['better-sqlite3'], // 强制不打包 Node.js 模块
+  // serverExternalPackages: ['better-sqlite3'], // 已禁用本地 SQLite，不再需要排除
   // 静态优化
   images: {
     unoptimized: true, // 禁用图片优化，减少 sharp 依赖的潜在打包体积
