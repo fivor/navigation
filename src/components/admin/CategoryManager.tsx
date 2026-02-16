@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
+import { IconPicker } from '@/components/ui/IconPicker';
 import { Dialog, DialogPanel, DialogTitle } from '@headlessui/react';
 import { Category } from '@/types';
 import { useRouter } from 'next/navigation';
@@ -153,12 +154,15 @@ export function CategoryManager({ initialCategories }: CategoryManagerProps) {
                 value={currentCategory.name || ''}
                 onChange={e => setCurrentCategory({ ...currentCategory, name: e.target.value })}
               />
-              <Input
-                label="图标 (Lucide 图标名，如: Layout, Book, Heart)"
-                value={currentCategory.icon || ''}
-                onChange={e => setCurrentCategory({ ...currentCategory, icon: e.target.value })}
-                placeholder="例如: Heart"
-              />
+              <div className="space-y-1">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  图标
+                </label>
+                <IconPicker
+                  value={currentCategory.icon || ''}
+                  onChange={(icon) => setCurrentCategory({ ...currentCategory, icon })}
+                />
+              </div>
               <Input
                 label="排序权重"
                 type="number"

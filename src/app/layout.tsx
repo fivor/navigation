@@ -3,6 +3,8 @@ import { Inter, Ma_Shan_Zheng } from "next/font/google";
 import "./globals.css";
 import { Providers } from "@/components/providers";
 
+export const runtime = 'edge';
+
 const inter = Inter({ subsets: ["latin"] });
 const maShanZheng = Ma_Shan_Zheng({ 
   weight: '400',
