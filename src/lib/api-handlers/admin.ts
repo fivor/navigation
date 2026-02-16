@@ -101,6 +101,32 @@ export const adminHandlers = {
     }
   },
 
+  getStats: async () => {
+    try {
+      const session = await getSession();
+      const userId = (session?.id as number) ?? null;
+      
+      const [linksCount, categoriesCount, recommendedCount, recentLinks] = await Promise.all([
+        sql`SELECT COUNT(*) as count FROM links WHERE (${userId} IS NULL OR user_id = ${userId})`,
+        sql`SELECT COUNT(*) as count FROM categories WHERE (${userId} IS NULL OR user_id = ${userId})`,
+        sql`SELECT COUNT(*) as count FROM links WHERE (${userId} IS NULL OR user_id = ${userId}) AND is_recommended = 1`,
+        sql`SELECT * FROM links WHERE (${userId} IS NULL OR user_id = ${userId}) ORDER BY created_at DESC LIMIT 5`
+      ]);
+      
+      const stats = {
+        links: Number(linksCount.rows[0].count),
+        categories: Number(categoriesCount.rows[0].count),
+        recommended: Number(recommendedCount.rows[0].count),
+        recentLinks: recentLinks.rows
+      };
+      
+      return NextResponse.json({ success: true, data: stats });
+    } catch (error) {
+      console.error('Failed to fetch stats:', error);
+      return NextResponse.json({ success: false, message: 'Failed to fetch stats' }, { status: 500 });
+    }
+  },
+
   updateSettings: async (request: Request) => {
     try {
       const session = await getSession();

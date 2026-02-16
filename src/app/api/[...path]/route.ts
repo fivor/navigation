@@ -33,6 +33,11 @@ export async function GET(request: Request, { params }: { params: Promise<{ path
     return adminHandlers.getSettings();
   }
   
+  // Admin stats
+  if (fullPath === 'admin/stats') {
+    return adminHandlers.getStats();
+  }
+  
   // Export
   if (fullPath === 'export') {
     return exportImportHandlers.export(request);
