@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { sql } from '@/lib/db';
 import { getSession } from '@/lib/session';
 import { Link, Category } from '@/types';
-import plist from 'plist';
+// import plist from 'plist';
 
 export const exportImportHandlers = {
   export: async (request: Request) => {
@@ -244,6 +244,7 @@ export const exportImportHandlers = {
         return NextResponse.json({ success: false, message: 'File is required' }, { status: 400 });
       }
 
+      /*
       const text = await file.text();
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const data = plist.parse(text) as any;
@@ -318,6 +319,8 @@ export const exportImportHandlers = {
         duplicates: duplicateCount,
         categories: Array.from(categoriesSet)
       });
+      */
+      return NextResponse.json({ success: false, message: 'Safari import temporarily disabled due to Edge Runtime compatibility' }, { status: 501 });
 
     } catch (error) {
       console.error('Import Safari error:', error);

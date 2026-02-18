@@ -1,0 +1,13 @@
+name = "navigation-app"
+compatibility_date = "2024-09-23"
+compatibility_flags = ["nodejs_compat"]
+pages_build_output_dir = ".vercel/output/static"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "navigation-db"
+database_id = "f28150ec-80f7-4bdd-8001-be6d67707cea"
+
+[[r2_buckets]]
+binding = "R2"
+bucket_name = "imgbox"

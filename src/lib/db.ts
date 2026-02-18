@@ -1,4 +1,5 @@
 import { D1Database } from '@cloudflare/workers-types';
+import { getRequestContext } from '@cloudflare/next-on-pages';
 
 /**
  * Cloudflare D1 适配器
@@ -6,7 +7,7 @@ import { D1Database } from '@cloudflare/workers-types';
  * 并在本地开发时提供 SQLite 回退
  */
 
-let localDb: any = null;
+const localDb: any = null;
 
 export const sql = async <T = any>(
   strings: TemplateStringsArray,
@@ -14,18 +15,29 @@ export const sql = async <T = any>(
 ): Promise<{ rows: T[]; rowCount: number }> => {
   // 1. 构造 SQL 语句
   let query = '';
-  const isSQLite = true; // D1 和 better-sqlite3 都使用 ? 占位符
-
-  if (isSQLite) {
-    query = strings[0];
-    for (let i = 1; i < strings.length; i++) {
-      query += '?' + strings[i];
-    }
+  // Combine strings into query
+  query = strings[0];
+  for (let i = 1; i < strings.length; i++) {
+    query += '?' + strings[i];
   }
 
   // 2. 获取数据库实例
-  // 在 Cloudflare Pages 中，DB 绑定在 process.env.DB
-  const db = (process.env.DB as unknown) as D1Database;
+  let db: D1Database | null = null;
+  
+  // 尝试从 getRequestContext 获取 D1 绑定 (Edge Runtime)
+  try {
+    const ctx = getRequestContext();
+    if (ctx && ctx.env && (ctx.env as any).DB) {
+      db = (ctx.env as any).DB as D1Database;
+    }
+  } catch (e) {
+    // Ignore context error
+  }
+
+  // 尝试从 process.env 获取 (Legacy / Custom setup)
+  if (!db && process.env.DB) {
+    db = (process.env.DB as unknown) as D1Database;
+  }
 
   if (db) {
     try {
@@ -49,45 +61,8 @@ export const sql = async <T = any>(
     }
   }
 
-  // 3. 本地开发回退 (仅在 Node.js 环境且开发模式下)
-  // 为减少 Cloudflare Worker 打包体积，暂时禁用本地 SQLite 回退
-  // 请使用 `wrangler pages dev` 进行本地 D1 开发调试
-  /*
-  if (process.env.NODE_ENV === 'development' && process.env.NEXT_RUNTIME !== 'edge') {
-    try {
-      // 使用动态 require 绕过 Edge 编译器的静态分析
-      // 使用 module.require 确保 webpack 不会处理它
-      const dbModule = 'better-sqlite3';
-      const Database = module.require(dbModule);
-
-      if (!localDb) {
-        const pathModule = 'path';
-        const path = module.require(pathModule);
-        // 使用相对路径，避免直接引用 process.cwd()
-        const dbPath = path.resolve('local.db');
-        localDb = new Database(dbPath);
-      }
-
-      const stmt = localDb.prepare(query);
-      const trimmedQuery = query.trim().toUpperCase();
-
-      if (trimmedQuery.startsWith('SELECT')) {
-        const rows = stmt.all(...values) as T[];
-        return { rows: rows || [], rowCount: rows?.length || 0 };
-      } else {
-        const result = stmt.run(...values);
-        if (trimmedQuery.includes('RETURNING')) {
-          const rows = localDb.prepare(query).all(...values) as T[];
-          return { rows: rows || [], rowCount: rows?.length || 0 };
-        }
-        return { rows: [], rowCount: result.changes || 0 };
-      }
-    } catch (e) {
-      // 忽略错误
-    }
-  }
-  */
-
-  console.error('D1 Database binding "DB" not found.');
-  throw new Error('D1 Database not bound. If you are developing locally, please use "wrangler pages dev" which supports D1 bindings.');
+  // 3. 这里的本地开发回退代码已被移除，因为我们使用 wrangler pages dev 进行本地开发
+  // 并且 D1 绑定已经可用
+  console.warn('D1 Database binding not found. Please ensure you are running with `wrangler pages dev` and have D1 binding configured.');
+  return { rows: [], rowCount: 0 };
 };

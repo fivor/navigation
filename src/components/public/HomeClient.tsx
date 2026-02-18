@@ -25,8 +25,8 @@ export function HomeClient() {
           fetch('/api/links' + (search ? `?search=${encodeURIComponent(search)}` : ''))
         ]);
         
-        const catData = await catRes.json();
-        const linkData = await linkRes.json();
+        const catData = await catRes.json() as any;
+        const linkData = await linkRes.json() as any;
 
         if (catData.success && catData.data) {
           setCategories(catData.data);

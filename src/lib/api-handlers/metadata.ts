@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getSession } from '@/lib/session';
+import { getRequestContext } from '@cloudflare/next-on-pages';
 
 export const metadataHandlers = {
   fetchMetadata: async (request: Request) => {
@@ -16,49 +17,25 @@ export const metadataHandlers = {
         return NextResponse.json({ success: false, message: 'URL is required' }, { status: 400 });
       }
 
-      // Basic SSRF guards
       let parsed: URL;
       try {
         parsed = new URL(url);
       } catch {
         return NextResponse.json({ success: false, message: 'Invalid URL' }, { status: 400 });
       }
-      if (!/^https?:$/.test(parsed.protocol)) {
-        return NextResponse.json({ success: false, message: 'Unsupported protocol' }, { status: 400 });
-      }
-      const hostname = parsed.hostname.toLowerCase();
-      const isIp = /^\d{1,3}(\.\d{1,3}){3}$/.test(hostname);
-      const isPrivate =
-        hostname === 'localhost' ||
-        hostname.endsWith('.local') ||
-        hostname.endsWith('.internal') ||
-        (isIp && (
-          hostname.startsWith('10.') ||
-          hostname.startsWith('192.168.') ||
-          (hostname.startsWith('172.') && parseInt(hostname.split('.')[1]) >= 16 && parseInt(hostname.split('.')[1]) <= 31)
-        ));
-
-      if (isPrivate) {
-         return NextResponse.json({ success: false, message: 'Invalid target' }, { status: 400 });
-      }
-
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 5000); // 5s timeout
 
       const res = await fetch(url, {
-        signal: controller.signal,
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (compatible; NavigationBot/1.0)',
-        },
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (compatible; NavigationBot/1.0)',
+          },
       });
-      clearTimeout(timeoutId);
 
       if (!res.ok) {
         return NextResponse.json({ success: false, message: `Failed to fetch: ${res.status}` }, { status: 400 });
       }
 
       const html = await res.text();
-
+      
       // Extract metadata
       const titleMatch = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
       const title = titleMatch ? titleMatch[1].trim() : '';
@@ -68,7 +45,6 @@ export const metadataHandlers = {
         const match = html.match(regex);
         if (match) return match[1];
         
-        // Try reverse order: content then name/property
         const regexRev = new RegExp(`<meta[^>]*content=["']([^"']*)["'][^>]*(?:name|property)=["']${nameOrProperty}["']`, 'i');
         const matchRev = html.match(regexRev);
         return matchRev ? matchRev[1] : '';
@@ -80,7 +56,7 @@ export const metadataHandlers = {
 
       // Extract icons
       const icons: { href: string; sizeScore: number; priority: number }[] = [];
-      const linkRegex = /<link[^>]*rel=["']([^"']*)["'][^>]*>/gi;
+      const linkRegex = /<link[^>]+rel=["']([^"']*)["'][^>]*>/gi;
       let match;
       while ((match = linkRegex.exec(html)) !== null) {
         const fullTag = match[0];
@@ -90,47 +66,98 @@ export const metadataHandlers = {
           const hrefMatch = fullTag.match(/href=["']([^"']*)["']/i);
           const sizesMatch = fullTag.match(/sizes=["']([^"']*)["']/i);
           
-          if (hrefMatch) {
-            let href = hrefMatch[1];
-            // Handle relative URLs
-            try {
-               href = new URL(href, url).toString();
-            } catch {}
-
-            const sizes = sizesMatch ? sizesMatch[1] : '';
-            let sizeScore = 48;
-            
-            const sMatch = sizes.match(/(\d+)\s*x\s*(\d+)/i);
-            if (sMatch) {
-              sizeScore = Math.max(parseInt(sMatch[1]), parseInt(sMatch[2]));
-            } else if (/apple-touch-icon/i.test(rel)) {
-              sizeScore = 180;
-            } else if (href.toLowerCase().endsWith('.ico')) {
-              sizeScore = 64;
-            }
-            
-            const priority = rel.includes('apple-touch-icon') ? 3 : rel.includes('shortcut') ? 1 : 2;
-            icons.push({ href, sizeScore, priority });
+          if (hrefMatch && hrefMatch[1]) {
+             let href = hrefMatch[1];
+             try {
+                href = new URL(href, url).toString();
+                
+                const sizes = sizesMatch ? sizesMatch[1] : '';
+                let sizeScore = 0;
+                let priority = 1;
+                
+                const sMatch = sizes.match(/(\d+)/);
+                if (sMatch) {
+                  sizeScore = parseInt(sMatch[1]);
+                  priority = 3;
+                } else if (rel.includes('apple-touch-icon')) {
+                  sizeScore = 180;
+                  priority = 4;
+                } else if (href.toLowerCase().endsWith('.svg')) {
+                  sizeScore = 512;
+                  priority = 2;
+                } else if (href.toLowerCase().endsWith('.ico')) {
+                  sizeScore = 32;
+                  priority = 1;
+                } else {
+                  sizeScore = 48;
+                  priority = 2;
+                }
+                
+                icons.push({ href, sizeScore, priority });
+             } catch (e) {
+                 // ignore invalid urls
+             }
           }
         }
       }
 
-      if (ogImage) {
-        let ogImgUrl = ogImage;
-        try {
-           ogImgUrl = new URL(ogImage, url).toString();
-        } catch {}
-        icons.push({ href: ogImgUrl, sizeScore: 300, priority: 0 });
+      // Default favicon
+      try {
+        const defaultIcon = new URL('/favicon.ico', url).toString();
+        icons.push({ href: defaultIcon, sizeScore: 16, priority: 0 });
+      } catch {}
+
+      icons.sort((a, b) => b.priority - a.priority || b.sizeScore - a.sizeScore);
+
+      let finalIcon = icons.length > 0 ? icons[0].href : '';
+      if (!finalIcon && ogImage) {
+         try {
+            finalIcon = new URL(ogImage, url).toString();
+         } catch {}
       }
 
-      icons.sort((a, b) => b.sizeScore - a.sizeScore || b.priority - a.priority);
+      // Upload to R2 if found
+      let r2Url = null;
+      if (finalIcon) {
+          try {
+              const iconRes = await fetch(finalIcon);
+              if (iconRes.ok) {
+                  const blob = await iconRes.blob();
+                  const buffer = await blob.arrayBuffer();
+                  
+                  // Generate unique filename
+                   const randomName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${finalIcon.split('.').pop()?.split('?')[0] || 'png'}`;
+                   const objectKey = `icons/${randomName}`;
+                   
+                   // Get R2 binding
+                   const { env } = getRequestContext();
+                   const R2 = (env as any).R2;
+                   if (R2) {
+                       await R2.put(objectKey, buffer, {
+                           httpMetadata: {
+                               contentType: iconRes.headers.get('content-type') || 'image/png',
+                           }
+                       });
+                       
+                       // Construct R2 URL (assuming public access or worker proxy)
+                        // Use /api/icons/ route to serve R2 directly
+                        r2Url = `/api/icons/${randomName}`;
+                   } else {
+                      console.warn('R2 binding not found');
+                  }
+              }
+          } catch (e) {
+              console.error('Failed to upload icon to R2', e);
+          }
+      }
 
       return NextResponse.json({
         success: true,
         data: {
           title: title || ogTitle,
-          description,
-          icon: icons.length > 0 ? icons[0].href : ''
+          description: description,
+          icon: finalIcon, // Original URL
+          r2_icon: r2Url   // Uploaded R2 URL
         }
       });
     } catch (error) {

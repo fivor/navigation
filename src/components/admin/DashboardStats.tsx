@@ -23,7 +23,7 @@ export function DashboardStats() {
   useEffect(() => {
     fetch('/api/admin/stats')
       .then(res => res.json())
-      .then(res => {
+      .then((res: any) => {
         if (res.success && res.data) {
           setStats(res.data);
         }

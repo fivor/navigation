@@ -28,6 +28,14 @@ const nextConfig: NextConfig = {
     };
     return config;
   },
+  async rewrites() {
+    return [
+      {
+        source: '/icons/:path*',
+        destination: '/api/icons/:path*',
+      },
+    ];
+  },
 };
 
 export default nextConfig;

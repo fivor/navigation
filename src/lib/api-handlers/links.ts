@@ -5,6 +5,23 @@ import { Link } from '@/types';
 import { z } from 'zod';
 import { revalidatePath } from 'next/cache';
 
+export async function getLinks(userId: number | null, options: { categoryId?: number | null, search?: string | null, limit?: number, offset?: number } = {}) {
+  const { categoryId = null, search = null, limit = 100, offset = 0 } = options;
+  const searchPattern = search ? `%${search}%` : null;
+  
+  const result = await sql<Link & { category_name: string }>`
+    SELECT l.*, c.name as category_name 
+    FROM links l
+    LEFT JOIN categories c ON l.category_id = c.id
+    WHERE (${userId} IS NULL OR l.user_id = ${userId})
+    AND (${categoryId} IS NULL OR l.category_id = ${categoryId})
+    AND (${searchPattern} IS NULL OR l.title LIKE ${searchPattern} OR l.description LIKE ${searchPattern})
+    ORDER BY l.sort_order ASC, l.created_at DESC
+    LIMIT ${limit} OFFSET ${offset}
+  `;
+  return result.rows;
+}
+
 export const linksHandlers = {
   list: async (request: Request) => {
     try {
@@ -15,31 +32,24 @@ export const linksHandlers = {
       const limit = parseInt(searchParams.get('limit') || '20');
       const offset = (page - 1) * limit;
 
-      const searchPattern = search ? `%${search}%` : null;
       const session = await getSession();
       const userId = (session?.id as number) ?? null;
 
-      const result = await sql<Link>`
-        SELECT * FROM links 
-        WHERE (${userId} IS NULL OR user_id = ${userId})
-        AND (${categoryId} IS NULL OR category_id = ${categoryId})
-        AND (${searchPattern} IS NULL OR title LIKE ${searchPattern} OR description LIKE ${searchPattern})
-        ORDER BY sort_order ASC, created_at DESC
-        LIMIT ${limit} OFFSET ${offset}
-      `;
+      const rows = await getLinks(userId, { categoryId, search, limit, offset });
 
+      const searchPattern = search ? `%${search}%` : null;
       const countResult = await sql`
-        SELECT COUNT(*) as total FROM links 
-        WHERE (${userId} IS NULL OR user_id = ${userId})
-        AND (${categoryId} IS NULL OR category_id = ${categoryId})
-        AND (${searchPattern} IS NULL OR title LIKE ${searchPattern} OR description LIKE ${searchPattern})
+        SELECT COUNT(*) as total FROM links l
+        WHERE (${userId} IS NULL OR l.user_id = ${userId})
+        AND (${categoryId} IS NULL OR l.category_id = ${categoryId})
+        AND (${searchPattern} IS NULL OR l.title LIKE ${searchPattern} OR l.description LIKE ${searchPattern})
       `;
 
       const total = parseInt(countResult.rows[0].total as string);
 
       return NextResponse.json({
         success: true,
-        data: result.rows,
+        data: rows,
         pagination: {
           page,
           limit,
@@ -78,7 +88,30 @@ export const linksHandlers = {
         return NextResponse.json({ success: false, message: 'Invalid link data' }, { status: 400 });
       }
 
+      // First check if the link already exists to avoid unique constraint error
+      // But we need to parse the body first, which we did above.
+      // However, we can't consume the stream twice.
+      // Wait, we are calling request.json() twice? No, schema parsing takes the object.
+      // Wait, let's look at the code:
+      // const Schema = ...
+      // const parse = Schema.safeParse(await request.json()); 
+      // This looks correct.
+      
       const { title, url, description, categoryId, icon, icon_orig, sort_order, is_recommended } = parse.data;
+
+      // Check for existing link with same URL and User
+      // Normalize URL for comparison (remove trailing slash)
+      const normalizedUrl = url.replace(/\/$/, '');
+      const normalizedUrlWithSlash = normalizedUrl + '/';
+      
+      const existing = await sql`SELECT id FROM links WHERE user_id = ${session.id as number} AND (url = ${normalizedUrl} OR url = ${normalizedUrlWithSlash})`;
+      if (existing.rows.length > 0) {
+         console.log(`[Link Create] Duplicate found: ${url} matches existing ID ${existing.rows[0].id}`);
+         return NextResponse.json(
+          { success: false, message: '该链接已存在，请勿重复添加' },
+          { status: 409 }
+        );
+      }
 
       const result = await sql<Link>`
         INSERT INTO links (title, url, description, category_id, icon, icon_orig, user_id, sort_order, is_recommended)
@@ -145,7 +178,12 @@ export const linksHandlers = {
       `;
 
       if (result.rows.length === 0) {
-        return NextResponse.json({ success: false, message: 'Link not found' }, { status: 404 });
+        // Idempotency: check if it's already gone
+        const check = await sql`SELECT id FROM links WHERE id = ${id} AND user_id = ${session.id as number}`;
+        if (check.rows.length === 0) {
+            return NextResponse.json({ success: true, id });
+        }
+        return NextResponse.json({ success: false, message: 'Link not found or permission denied' }, { status: 404 });
       }
 
       revalidatePath('/');
@@ -175,7 +213,12 @@ export const linksHandlers = {
       `;
 
       if (result.rows.length === 0) {
-        return NextResponse.json({ success: false, message: 'Link not found' }, { status: 404 });
+        // Idempotency: check if it's already gone
+        const check = await sql`SELECT id FROM links WHERE id = ${id} AND user_id = ${session.id as number}`;
+        if (check.rows.length === 0) {
+            return NextResponse.json({ success: true, id });
+        }
+        return NextResponse.json({ success: false, message: 'Link not found or permission denied' }, { status: 404 });
       }
 
       revalidatePath('/');
@@ -198,7 +241,7 @@ export const linksHandlers = {
         return NextResponse.json({ success: false, message: 'Unauthorized' }, { status: 401 });
       }
 
-      const { linkIds } = await request.json();
+      const { linkIds } = await request.json() as any;
 
       if (!Array.isArray(linkIds)) {
         return NextResponse.json({ success: false, message: 'Invalid data' }, { status: 400 });

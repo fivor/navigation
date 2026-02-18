@@ -22,7 +22,7 @@ export default function IconSettingsPage() {
     (async () => {
       try {
         const res = await fetch('/api/admin/settings');
-        const data = await res.json();
+        const data = await res.json() as any;
         if (data?.success && data?.data) {
           const d = data.data;
           if (d.accessKeyId) setAccessKeyId(d.accessKeyId);
@@ -57,7 +57,7 @@ export default function IconSettingsPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
-      const data = await res.json();
+      const data = await res.json() as any;
       if (data.success) {
         setR2Msg('设置已保存');
       } else {
@@ -77,7 +77,7 @@ export default function IconSettingsPage() {
     setClearRes(null);
     try {
       const res = await fetch('/api/admin/icons/clear', { method: 'POST' });
-      const data = await res.json();
+      const data = await res.json() as any;
       if (data.success) {
         setClearRes({ message: data.message, count: data.count });
       } else {

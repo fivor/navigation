@@ -94,6 +94,8 @@ export const authHandlers = {
         );
       }
 
+      console.log('User role before signing token:', user.role); // Add this line for debugging
+
       const token = await signToken({ 
         id: user.id, 
         email: user.email, 

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { IconPicker } from '@/components/ui/IconPicker';
@@ -16,9 +16,18 @@ export function CategoryManager({ initialCategories = [] }: CategoryManagerProps
   const router = useRouter();
   const [categories, setCategories] = useState(initialCategories);
   
+  // 监听 initialCategories 变化并同步到本地状态
   useEffect(() => {
-    // If initialCategories is provided (e.g. from SSR or after router.refresh()), update state
-    setCategories(initialCategories);
+    // 只有当传入的 initialCategories 与当前的 categories 不一致（且确实有数据变化）时才更新
+    // 简单的引用比较可能不够，因为每次 router.refresh() 都可能产生新数组引用
+    // 这里我们做一个简单的 id 列表对比，或者直接更新
+    
+    // 为了防止“本地刚添加完 -> router.refresh() 触发 -> 导致数据回跳或重复”等问题，
+    // 我们信任 initialCategories 为最新数据源。
+    
+    // 去重逻辑：确保不会出现重复 ID
+    const uniqueCategories = initialCategories.filter((v, i, a) => a.findIndex(t => t.id === v.id) === i);
+    setCategories(uniqueCategories);
   }, [initialCategories]);
   
   // Only fetch if initialCategories is empty on mount (SPA navigation to this page)
@@ -26,7 +35,7 @@ export function CategoryManager({ initialCategories = [] }: CategoryManagerProps
     if (initialCategories.length === 0) {
       fetch('/api/categories')
         .then(res => res.json())
-        .then(res => {
+        .then((res: any) => {
           if (res.success && res.data) {
             setCategories(res.data);
           }
@@ -37,6 +46,7 @@ export function CategoryManager({ initialCategories = [] }: CategoryManagerProps
   const [isOpen, setIsOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const isSubmittingRef = useRef(false);
   const [currentCategory, setCurrentCategory] = useState<Partial<Category>>({});
 
   const openAddModal = () => {
@@ -51,8 +61,11 @@ export function CategoryManager({ initialCategories = [] }: CategoryManagerProps
     setIsOpen(true);
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = async (e?: any) => {
+    if (e && e.preventDefault) e.preventDefault();
+    if (isSubmittingRef.current || isLoading) return;
+    
+    isSubmittingRef.current = true;
     setIsLoading(true);
 
     try {
@@ -74,12 +87,38 @@ export function CategoryManager({ initialCategories = [] }: CategoryManagerProps
 
       if (res.ok) {
         setIsOpen(false);
-        const data = await res.json();
-        // Optimistic update or wait for router.refresh
-        // If we rely on router.refresh(), it will update initialCategories which will update categories state via useEffect
+        const responseData = await res.json() as any;
+        
+        // Update local state immediately
+        // Removed manual state update to avoid duplicates with router.refresh()
+        // The router.refresh() call below will trigger a re-fetch of the data
+        /*
+        if (responseData.success && responseData.data) {
+          const newCategory = responseData.data;
+          
+          setCategories(prev => {
+            if (isEditing) {
+              return prev.map(c => c.id === newCategory.id ? { ...c, ...newCategory } : c);
+            } else {
+              // Check if category already exists to avoid duplicates (e.g. from router.refresh race condition)
+              if (prev.some(c => c.id === newCategory.id)) {
+                return prev;
+              }
+              // Add new category
+              const categoryWithExtras = {
+                ...newCategory,
+                parent_name: categories.find(p => p.id === newCategory.parent_id)?.name || null,
+                links_count: 0
+              };
+              return [categoryWithExtras, ...prev];
+            }
+          });
+        }
+        */
+        
         router.refresh();
       } else {
-        const data = await res.json();
+        const data = await res.json() as any;
         alert(data.message || '操作失败');
       }
     } catch (error) {
@@ -87,6 +126,7 @@ export function CategoryManager({ initialCategories = [] }: CategoryManagerProps
       alert('发生错误');
     } finally {
       setIsLoading(false);
+      isSubmittingRef.current = false;
     }
   };
 
@@ -96,9 +136,11 @@ export function CategoryManager({ initialCategories = [] }: CategoryManagerProps
       try {
         const res = await fetch(`/api/categories/${id}`, { method: 'DELETE' });
         if (res.ok) {
+            // Update local state
+            setCategories(prev => prev.filter(c => c.id !== id));
             router.refresh();
         } else {
-            const data = await res.json();
+            const data = await res.json() as any;
             alert(data.message || '删除失败');
         }
       } catch (error) {
@@ -167,12 +209,13 @@ export function CategoryManager({ initialCategories = [] }: CategoryManagerProps
             <DialogTitle className="text-lg font-medium leading-6 text-gray-900 dark:text-white mb-4">
               {isEditing ? '编辑分类' : '添加分类'}
             </DialogTitle>
-            <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-4">
               <Input
                 label="名称"
                 required
                 value={currentCategory.name || ''}
                 onChange={e => setCurrentCategory({ ...currentCategory, name: e.target.value })}
+                onKeyDown={(e) => e.key === 'Enter' && handleSubmit(e)}
               />
               <div className="space-y-1">
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
@@ -188,6 +231,7 @@ export function CategoryManager({ initialCategories = [] }: CategoryManagerProps
                 type="number"
                 value={currentCategory.sort_order || 0}
                 onChange={e => setCurrentCategory({ ...currentCategory, sort_order: parseInt(e.target.value) })}
+                onKeyDown={(e) => e.key === 'Enter' && handleSubmit(e)}
               />
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">父级分类</label>
@@ -195,6 +239,7 @@ export function CategoryManager({ initialCategories = [] }: CategoryManagerProps
                   className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm dark:bg-gray-800 dark:border-gray-700 dark:text-white p-2"
                   value={currentCategory.parent_id || ''}
                   onChange={e => setCurrentCategory({ ...currentCategory, parent_id: e.target.value ? Number(e.target.value) : null })}
+                  onKeyDown={(e) => e.key === 'Enter' && handleSubmit(e)}
                 >
                   <option value="">无 (作为顶级分类)</option>
                   {availableParents.map(c => (
@@ -205,9 +250,9 @@ export function CategoryManager({ initialCategories = [] }: CategoryManagerProps
               
               <div className="flex justify-end gap-2 mt-6">
                 <Button type="button" variant="ghost" onClick={() => setIsOpen(false)}>取消</Button>
-                <Button type="submit" isLoading={isLoading}>保存</Button>
+                <Button type="button" isLoading={isLoading} onClick={handleSubmit}>保存</Button>
               </div>
-            </form>
+            </div>
           </DialogPanel>
         </div>
       </Dialog>

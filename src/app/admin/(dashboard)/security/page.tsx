@@ -37,7 +37,7 @@ export default function SecuritySettingsPage() {
           newPassword: newPassword || undefined,
         }),
       });
-      const data = await res.json();
+      const data = await res.json() as any;
       if (data.success) {
         setSecMsg('保存成功，请使用新邮箱/密码重新登录');
         await fetch('/api/auth/logout', { method: 'POST' });
