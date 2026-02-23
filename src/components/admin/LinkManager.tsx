@@ -109,24 +109,16 @@ export function LinkManager({
 
   const filteredLinks = useMemo(() => {
     if (selectedCategory === 'all') return links;
-    // Sort links: first by sort_order (ASC), then by created_at (DESC)
-    // The initialLinks prop might be sorted globally, but when we filter, we want to respect the category-specific sort order.
-    // However, our backend query already sorts by sort_order then created_at.
-    // The issue is when we reorder locally, we update the array but maybe the sort order logic is lost or we need to rely on the array index as the source of truth for display.
-    
-    // When selectedCategory is NOT 'all', we should trust the order in 'links' array if we update it correctly.
-    // But 'links' contains all links.
-    
+
     return links
-        .filter(l => l.category_id.toString() === selectedCategory)
-        .sort((a, b) => {
-            // If sort_order is different, use it
-            if ((a.sort_order || 0) !== (b.sort_order || 0)) {
-                return (a.sort_order || 0) - (b.sort_order || 0);
-            }
-            // Fallback to created_at desc (newest first)
-            return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
-        });
+      .filter(l => l.category_id.toString() === selectedCategory)
+      .sort((a, b) => {
+        // 先按 sort_order 排序，再按创建时间倒序
+        if ((a.sort_order || 0) !== (b.sort_order || 0)) {
+          return (a.sort_order || 0) - (b.sort_order || 0);
+        }
+        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+      });
   }, [links, selectedCategory]);
 
   const openAddModal = () => {
@@ -215,24 +207,25 @@ export function LinkManager({
       const url = isEditing ? `/api/links/${currentLink.id}` : '/api/links';
       const method = isEditing ? 'PUT' : 'POST';
       
-      const body = {
-        title: currentLink.title,
-        url: currentLink.url,
-        description: currentLink.description,
-        categoryId: currentLink.category_id || (selectedCategory !== 'all' ? parseInt(selectedCategory) : null),
-        icon: currentLink.icon,
-        icon_orig: currentLink.icon_orig,
-        sort_order: currentLink.sort_order,
-        is_recommended: currentLink.is_recommended
-      };
-
-      // Ensure categoryId is set
-      if (!body.categoryId) {
+      // Ensure categoryId is set before creating body
+      const categoryId = currentLink.category_id || (selectedCategory !== 'all' ? parseInt(selectedCategory) : null);
+      if (!categoryId || isNaN(categoryId)) {
          alert('请选择分类');
          setIsLoading(false);
          isSubmittingRef.current = false;
          return;
       }
+
+      const body = {
+        title: currentLink.title,
+        url: currentLink.url,
+        description: currentLink.description,
+        categoryId: categoryId,
+        icon: currentLink.icon,
+        icon_orig: currentLink.icon_orig,
+        sort_order: currentLink.sort_order ?? 0,
+        is_recommended: Boolean(currentLink.is_recommended)
+      };
 
       console.log('Submitting link:', method, url, body);
 
@@ -246,12 +239,12 @@ export function LinkManager({
         const data: any = await res.json();
         const saved = data.data as (Link & { category_name?: string });
         setIsOpen(false);
-        // Removed manual state update to avoid duplicates with router.refresh()
-        /*
+        
+        // Update local state immediately for better UX
         if (isEditing && saved) {
           setLinks(prev => prev.map(l => {
             if (l.id === saved.id) {
-              return { ...l, ...saved, category_name: l.category_name };
+              return { ...l, ...saved, category_name: l.category_name || (categories.find(c => c.id === saved.category_id)?.name || '') };
             }
             return l;
           }));
@@ -260,7 +253,8 @@ export function LinkManager({
           const enriched = { ...saved, category_name: cat ? cat.name : '' } as Link & { category_name: string };
           setLinks(prev => [enriched, ...prev]);
         }
-        */
+        
+        // Also trigger router refresh to sync with server
         router.refresh();
       } else {
         const data = await res.json() as any;
@@ -301,43 +295,35 @@ export function LinkManager({
       const newIndex = filteredLinks.findIndex((item) => item.id === over?.id);
 
       const newOrderedLinks = arrayMove(filteredLinks, oldIndex, newIndex);
-      
-      // We need to determine the new global 'sort_order' values.
-      // Since 'filteredLinks' is just a subset, we can't just use 0, 1, 2... index unless we are sure.
-      // A better way: assign the 'sort_order' of the item at newIndex to the moved item, and shift others?
-      // Actually, simplest way for 'sort_order' column is to just re-assign 0, 1, 2... to the reordered list.
-      // And update the main state.
-      
-      // Create a map of id -> new sort_order
-      const orderMap = new Map();
+
+      // 创建 id -> sort_order 映射
+      const orderMap = new Map<number, number>();
       newOrderedLinks.forEach((link, index) => {
-          orderMap.set(link.id, index);
+        orderMap.set(link.id, index);
       });
-      
+
       const updatedLinks = links.map(link => {
-          if (orderMap.has(link.id)) {
-              return { ...link, sort_order: orderMap.get(link.id) };
-          }
-          return link;
+        if (orderMap.has(link.id)) {
+          return { ...link, sort_order: orderMap.get(link.id) ?? 0 };
+        }
+        return link;
       });
-      
+
       setLinks(updatedLinks);
 
-      // Send to backend
+      // 发送到后端
       const orderedIds = newOrderedLinks.map(l => l.id);
-      
+
       try {
-          await fetch('/api/links/reorder', {
-              method: 'PUT',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ linkIds: orderedIds }),
-          });
-          // No need to reload, we updated local state correctly
+        await fetch('/api/links/reorder', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ linkIds: orderedIds }),
+        });
       } catch (e) {
-          console.error('Failed to reorder', e);
-            alert('排序保存失败');
-            // Revert on failure if needed, or refresh the app data
-            router.refresh();
+        console.error('Failed to reorder', e);
+        alert('排序保存失败');
+        router.refresh();
       }
     }
   };

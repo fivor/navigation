@@ -5,12 +5,25 @@ import { Link } from '@/types';
 import { z } from 'zod';
 import { revalidatePath } from 'next/cache';
 
-export async function getLinks(userId: number | null, options: { categoryId?: number | null, search?: string | null, limit?: number, offset?: number } = {}) {
+/**
+ * 获取链接列表
+ * @param userId - 用户ID，null 表示获取所有用户的链接
+ * @param options - 查询选项
+ */
+export async function getLinks(
+  userId: number | null,
+  options: {
+    categoryId?: number | null;
+    search?: string | null;
+    limit?: number;
+    offset?: number;
+  } = {}
+): Promise<(Link & { category_name: string })[]> {
   const { categoryId = null, search = null, limit = 100, offset = 0 } = options;
   const searchPattern = search ? `%${search}%` : null;
-  
+
   const result = await sql<Link & { category_name: string }>`
-    SELECT l.*, c.name as category_name 
+    SELECT l.*, c.name as category_name
     FROM links l
     LEFT JOIN categories c ON l.category_id = c.id
     WHERE (${userId} IS NULL OR l.user_id = ${userId})
@@ -20,6 +33,21 @@ export async function getLinks(userId: number | null, options: { categoryId?: nu
     LIMIT ${limit} OFFSET ${offset}
   `;
   return result.rows;
+}
+
+/**
+ * URL 规范化函数 - 用于重复检测
+ * 移除协议、www 前缀和尾部斜杠
+ */
+function normalizeUrl(inputUrl: string): string {
+  try {
+    const urlObj = new URL(inputUrl);
+    const hostname = urlObj.hostname.replace(/^www\./i, '');
+    const pathname = urlObj.pathname.replace(/\/$/, '');
+    return (hostname + pathname).toLowerCase();
+  } catch {
+    return inputUrl.toLowerCase().replace(/\/$/, '');
+  }
 }
 
 export const linksHandlers = {
@@ -73,65 +101,85 @@ export const linksHandlers = {
         return NextResponse.json({ success: false, message: 'Unauthorized' }, { status: 401 });
       }
 
+      const body = await request.json() as Record<string, unknown>;
+
+      // 数据验证
       const Schema = z.object({
-        title: z.string().min(1).max(200),
-        url: z.string().url(),
-        description: z.string().max(500).optional().nullable(),
-        categoryId: z.number().int(),
-        icon: z.string().optional().nullable().or(z.literal('')),
-        icon_orig: z.string().optional().nullable().or(z.literal('')),
-        sort_order: z.number().int().min(0).optional(),
-        is_recommended: z.boolean().optional(),
+        title: z.coerce.string().min(1).max(200),
+        url: z.coerce.string().min(1),
+        description: z.coerce.string().max(500).optional().nullable(),
+        categoryId: z.coerce.number().int(),
+        icon: z.coerce.string().optional().nullable(),
+        icon_orig: z.coerce.string().optional().nullable(),
+        sort_order: z.coerce.number().int().min(0).optional(),
+        is_recommended: z.coerce.boolean().optional(),
       });
-      const parse = Schema.safeParse(await request.json());
+
+      const parse = Schema.safeParse(body);
       if (!parse.success) {
-        return NextResponse.json({ success: false, message: 'Invalid link data' }, { status: 400 });
+        return NextResponse.json({
+          success: false,
+          message: 'Invalid link data: ' + parse.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', ')
+        }, { status: 400 });
       }
 
-      // First check if the link already exists to avoid unique constraint error
-      // But we need to parse the body first, which we did above.
-      // However, we can't consume the stream twice.
-      // Wait, we are calling request.json() twice? No, schema parsing takes the object.
-      // Wait, let's look at the code:
-      // const Schema = ...
-      // const parse = Schema.safeParse(await request.json()); 
-      // This looks correct.
-      
       const { title, url, description, categoryId, icon, icon_orig, sort_order, is_recommended } = parse.data;
+      const userId = Number(session.id);
 
-      // Check for existing link with same URL and User
-      // Normalize URL for comparison (remove trailing slash)
-      const normalizedUrl = url.replace(/\/$/, '');
-      const normalizedUrlWithSlash = normalizedUrl + '/';
-      
-      const existing = await sql`SELECT id FROM links WHERE user_id = ${session.id as number} AND (url = ${normalizedUrl} OR url = ${normalizedUrlWithSlash})`;
-      if (existing.rows.length > 0) {
-         console.log(`[Link Create] Duplicate found: ${url} matches existing ID ${existing.rows[0].id}`);
-         return NextResponse.json(
-          { success: false, message: '该链接已存在，请勿重复添加' },
-          { status: 409 }
-        );
-      }
-
-      const result = await sql<Link>`
-        INSERT INTO links (title, url, description, category_id, icon, icon_orig, user_id, sort_order, is_recommended)
-        VALUES (${title}, ${url}, ${description || null}, ${categoryId}, ${icon || null}, ${icon_orig || null}, ${session.id as number}, ${sort_order || 0}, ${is_recommended || false})
-        RETURNING *
+      // 检查链接是否已存在（精确匹配）
+      const exactMatch = await sql<{ id: number; user_id: number }>`
+        SELECT id, user_id FROM links WHERE LOWER(url) = LOWER(${url})
       `;
 
-      revalidatePath('/');
-      revalidatePath('/admin');
-      revalidatePath('/admin/links');
-      return NextResponse.json({ success: true, data: result.rows[0] });
-    } catch (error: any) {
-      console.error('Create link error:', error);
-      // Handle SQLite unique constraint error
-      if (error.message && error.message.includes('UNIQUE constraint failed')) {
-         return NextResponse.json(
+      const sameUserMatch = exactMatch.rows.find((row) => row.user_id === userId);
+      if (sameUserMatch) {
+        return NextResponse.json(
           { success: false, message: '该链接已存在，请勿重复添加' },
           { status: 409 }
         );
       }
+
+      // 检查链接变体（www、尾部斜杠等）
+      const allLinks = await sql<{ id: number; url: string; user_id: number }>`
+        SELECT id, url, user_id FROM links WHERE user_id = ${userId}
+      `;
+
+      const normalizedNewUrl = normalizeUrl(url);
+      const duplicate = allLinks.rows.find((row) => {
+        return normalizeUrl(row.url) === normalizedNewUrl;
+      });
+
+      if (duplicate) {
+        return NextResponse.json(
+          { success: false, message: '该链接已存在，请勿重复添加' },
+          { status: 409 }
+        );
+      }
+
+      // 插入新链接
+      try {
+        const result = await sql<Link>`
+          INSERT INTO links (title, url, description, category_id, icon, icon_orig, user_id, sort_order, is_recommended)
+          VALUES (${title}, ${url}, ${description || null}, ${categoryId}, ${icon || null}, ${icon_orig || null}, ${userId}, ${sort_order || 0}, ${is_recommended || false})
+          RETURNING *
+        `;
+
+        revalidatePath('/');
+        revalidatePath('/admin');
+        revalidatePath('/admin/links');
+        return NextResponse.json({ success: true, data: result.rows[0] });
+      } catch (insertError: any) {
+        // D1 本地开发模式 workaround：处理唯一约束错误
+        if (insertError.message?.includes('UNIQUE constraint failed')) {
+          return NextResponse.json(
+            { success: false, message: '该链接已存在，请勿重复添加' },
+            { status: 409 }
+          );
+        }
+        throw insertError;
+      }
+    } catch (error: any) {
+      console.error('Create link error:', error);
       return NextResponse.json(
         { success: false, message: error.message || 'Failed to create link' },
         { status: 500 }
@@ -146,42 +194,83 @@ export const linksHandlers = {
         return NextResponse.json({ success: false, message: 'Unauthorized' }, { status: 401 });
       }
 
-      const Schema = z.object({
-        title: z.string().min(1).max(200),
-        url: z.string().url(),
-        description: z.string().max(500).optional().nullable(),
-        categoryId: z.number().int(),
-        icon: z.string().optional().nullable().or(z.literal('')),
-        icon_orig: z.string().optional().nullable().or(z.literal('')),
-        sort_order: z.number().int().min(0).optional(),
-        is_recommended: z.boolean().optional(),
-      });
-      const parsed = Schema.safeParse(await request.json());
-      if (!parsed.success) {
-        return NextResponse.json({ success: false, message: 'Invalid link data' }, { status: 400 });
+      const body = await request.json() as Record<string, unknown>;
+
+      // 数据预处理和验证
+      const rawIsRecommended = body.is_recommended;
+      let processedIsRecommended = false;
+      if (typeof rawIsRecommended === 'boolean') {
+        processedIsRecommended = rawIsRecommended;
+      } else if (typeof rawIsRecommended === 'number') {
+        processedIsRecommended = rawIsRecommended === 1;
+      } else if (typeof rawIsRecommended === 'string') {
+        processedIsRecommended = rawIsRecommended === 'true' || rawIsRecommended === '1';
       }
-      const { title, url, description, categoryId, icon, icon_orig, sort_order, is_recommended } = parsed.data;
+
+      const categoryId = Number(body.categoryId ?? body.category_id);
+      if (!categoryId || isNaN(categoryId)) {
+        return NextResponse.json({
+          success: false,
+          message: 'Invalid link data: categoryId: 请选择分类'
+        }, { status: 400 });
+      }
+
+      const title = String(body.title ?? '').trim();
+      const url = String(body.url ?? '').trim();
+
+      if (!title) {
+        return NextResponse.json({
+          success: false,
+          message: 'Invalid link data: title: 标题不能为空'
+        }, { status: 400 });
+      }
+
+      if (!url || (!url.startsWith('http://') && !url.startsWith('https://'))) {
+        return NextResponse.json({
+          success: false,
+          message: 'Invalid link data: url: 无效的URL格式'
+        }, { status: 400 });
+      }
+
+      const description = body.description ? String(body.description) : null;
+      const icon = body.icon ? String(body.icon) : null;
+      const icon_orig = body.icon_orig ? String(body.icon_orig) : null;
+      const sort_order = Number(body.sort_order) || 0;
+      const is_recommended = processedIsRecommended;
+      const userId = Number(session.id);
+
+      // 检查是否有其他链接使用相同的 URL
+      const existingUrl = await sql<{ id: number }>`
+        SELECT id FROM links WHERE LOWER(url) = LOWER(${url}) AND user_id = ${userId} AND id != ${id}
+      `;
+
+      if (existingUrl.rows.length > 0) {
+        return NextResponse.json(
+          { success: false, message: '该链接已存在，请勿重复添加' },
+          { status: 409 }
+        );
+      }
 
       const result = await sql<Link>`
         UPDATE links
         SET title = ${title},
             url = ${url},
-            description = ${description || null},
+            description = ${description},
             category_id = ${categoryId},
-            icon = ${icon || null},
-            icon_orig = ${icon_orig || null},
-            sort_order = ${sort_order || 0},
-            is_recommended = ${is_recommended || false},
+            icon = ${icon},
+            icon_orig = ${icon_orig},
+            sort_order = ${sort_order},
+            is_recommended = ${is_recommended},
             updated_at = CURRENT_TIMESTAMP
-        WHERE id = ${id} AND user_id = ${session.id as number}
+        WHERE id = ${id} AND user_id = ${userId}
         RETURNING *
       `;
 
       if (result.rows.length === 0) {
-        // Idempotency: check if it's already gone
-        const check = await sql`SELECT id FROM links WHERE id = ${id} AND user_id = ${session.id as number}`;
+        // 检查链接是否存在（幂等性处理）
+        const check = await sql`SELECT id FROM links WHERE id = ${id} AND user_id = ${userId}`;
         if (check.rows.length === 0) {
-            return NextResponse.json({ success: true, id });
+          return NextResponse.json({ success: true, id });
         }
         return NextResponse.json({ success: false, message: 'Link not found or permission denied' }, { status: 404 });
       }
@@ -206,17 +295,18 @@ export const linksHandlers = {
         return NextResponse.json({ success: false, message: 'Unauthorized' }, { status: 401 });
       }
 
+      const userId = Number(session.id);
       const result = await sql`
         DELETE FROM links
-        WHERE id = ${id} AND user_id = ${session.id as number}
+        WHERE id = ${id} AND user_id = ${userId}
         RETURNING id
       `;
 
       if (result.rows.length === 0) {
-        // Idempotency: check if it's already gone
-        const check = await sql`SELECT id FROM links WHERE id = ${id} AND user_id = ${session.id as number}`;
+        // 幂等性处理：检查链接是否已不存在
+        const check = await sql`SELECT id FROM links WHERE id = ${id}`;
         if (check.rows.length === 0) {
-            return NextResponse.json({ success: true, id });
+          return NextResponse.json({ success: true, id });
         }
         return NextResponse.json({ success: false, message: 'Link not found or permission denied' }, { status: 404 });
       }
@@ -237,24 +327,27 @@ export const linksHandlers = {
   reorder: async (request: Request) => {
     try {
       const session = await getSession();
-      if (!session) {
+      if (!session || session.role !== 'admin') {
         return NextResponse.json({ success: false, message: 'Unauthorized' }, { status: 401 });
       }
 
-      const { linkIds } = await request.json() as any;
+      const { linkIds } = await request.json() as { linkIds?: number[] };
 
       if (!Array.isArray(linkIds)) {
         return NextResponse.json({ success: false, message: 'Invalid data' }, { status: 400 });
       }
 
       if (linkIds.length === 0) {
-          return NextResponse.json({ success: true });
+        return NextResponse.json({ success: true });
       }
 
+      const userId = Number(session.id);
+
+      // 使用事务批量更新排序
       await Promise.all(
-        linkIds.map((id, index) => {
-          return sql`UPDATE links SET sort_order = ${index} WHERE id = ${id} AND user_id = ${session.id}`;
-        })
+        linkIds.map((id, index) =>
+          sql`UPDATE links SET sort_order = ${index} WHERE id = ${id} AND user_id = ${userId}`
+        )
       );
 
       revalidatePath('/');
@@ -264,6 +357,50 @@ export const linksHandlers = {
     } catch (error) {
       console.error('Reorder error:', error);
       return NextResponse.json({ success: false, message: 'Internal Server Error' }, { status: 500 });
+    }
+  },
+
+  /**
+   * 记录链接点击（增加点击计数）
+   */
+  trackClick: async (id: number) => {
+    try {
+      await sql`
+        UPDATE links
+        SET click_count = click_count + 1,
+            last_clicked_at = CURRENT_TIMESTAMP
+        WHERE id = ${id}
+      `;
+      return NextResponse.json({ success: true });
+    } catch (error) {
+      console.error('Track click error:', error);
+      return NextResponse.json({ success: false, message: 'Failed to track click' }, { status: 500 });
+    }
+  },
+
+  /**
+   * 获取热门链接（按点击数排序）
+   */
+  getPopular: async (request: Request) => {
+    try {
+      const { searchParams } = new URL(request.url);
+      const limit = parseInt(searchParams.get('limit') || '10');
+      const days = parseInt(searchParams.get('days') || '30');
+
+      const result = await sql<Link & { category_name: string }>`
+        SELECT l.*, c.name as category_name
+        FROM links l
+        LEFT JOIN categories c ON l.category_id = c.id
+        WHERE l.click_count > 0
+          AND (l.last_clicked_at IS NULL OR l.last_clicked_at > datetime('now', '-${days} days'))
+        ORDER BY l.click_count DESC, l.last_clicked_at DESC
+        LIMIT ${limit}
+      `;
+
+      return NextResponse.json({ success: true, data: result.rows });
+    } catch (error) {
+      console.error('Get popular links error:', error);
+      return NextResponse.json({ success: false, message: 'Failed to fetch popular links' }, { status: 500 });
     }
   }
 };

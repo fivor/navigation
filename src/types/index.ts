@@ -29,6 +29,11 @@ export interface Link {
   user_id: number;
   sort_order: number;
   is_recommended?: boolean;
+  click_count: number;
+  last_clicked_at: string | null;
+  last_check_status?: number | null;
+  last_check_time?: string | null;
+  last_response_time?: number | null;
   created_at: string;
   updated_at: string;
 }

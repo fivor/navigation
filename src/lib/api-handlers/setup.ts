@@ -2,7 +2,106 @@ import { NextResponse } from 'next/server';
 import { sql } from '@/lib/db';
 import { hashPassword } from '@/lib/password';
 
+/**
+ * 执行数据库迁移
+ * 添加新功能所需的字段
+ */
+async function runMigrations() {
+  const results: { field: string; status: 'added' | 'exists' | 'error'; error?: string }[] = [];
+
+  // 迁移：click_count
+  try {
+    await sql`ALTER TABLE links ADD COLUMN click_count INTEGER DEFAULT 0`;
+    results.push({ field: 'click_count', status: 'added' });
+  } catch (error: any) {
+    if (error.message?.includes('duplicate column') || error.message?.includes('already exists')) {
+      results.push({ field: 'click_count', status: 'exists' });
+    } else {
+      results.push({ field: 'click_count', status: 'error', error: error.message });
+    }
+  }
+
+  // 迁移：last_clicked_at
+  try {
+    await sql`ALTER TABLE links ADD COLUMN last_clicked_at DATETIME`;
+    results.push({ field: 'last_clicked_at', status: 'added' });
+  } catch (error: any) {
+    if (error.message?.includes('duplicate column') || error.message?.includes('already exists')) {
+      results.push({ field: 'last_clicked_at', status: 'exists' });
+    } else {
+      results.push({ field: 'last_clicked_at', status: 'error', error: error.message });
+    }
+  }
+
+  // 迁移：last_check_status
+  try {
+    await sql`ALTER TABLE links ADD COLUMN last_check_status INTEGER`;
+    results.push({ field: 'last_check_status', status: 'added' });
+  } catch (error: any) {
+    if (error.message?.includes('duplicate column') || error.message?.includes('already exists')) {
+      results.push({ field: 'last_check_status', status: 'exists' });
+    } else {
+      results.push({ field: 'last_check_status', status: 'error', error: error.message });
+    }
+  }
+
+  // 迁移：last_check_time
+  try {
+    await sql`ALTER TABLE links ADD COLUMN last_check_time DATETIME`;
+    results.push({ field: 'last_check_time', status: 'added' });
+  } catch (error: any) {
+    if (error.message?.includes('duplicate column') || error.message?.includes('already exists')) {
+      results.push({ field: 'last_check_time', status: 'exists' });
+    } else {
+      results.push({ field: 'last_check_time', status: 'error', error: error.message });
+    }
+  }
+
+  // 迁移：last_response_time
+  try {
+    await sql`ALTER TABLE links ADD COLUMN last_response_time INTEGER`;
+    results.push({ field: 'last_response_time', status: 'added' });
+  } catch (error: any) {
+    if (error.message?.includes('duplicate column') || error.message?.includes('already exists')) {
+      results.push({ field: 'last_response_time', status: 'exists' });
+    } else {
+      results.push({ field: 'last_response_time', status: 'error', error: error.message });
+    }
+  }
+
+  return results;
+}
+
 export const setupHandlers = {
+  /**
+   * 执行数据库迁移
+   */
+  migrate: async (request: Request) => {
+    try {
+      const { searchParams } = new URL(request.url);
+      const secret = searchParams.get('secret');
+      
+      // Simple protection
+      if (secret !== process.env.SETUP_SECRET && process.env.NODE_ENV === 'production') {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      }
+
+      const results = await runMigrations();
+      
+      return NextResponse.json({
+        success: true,
+        message: 'Database migration completed',
+        migrations: results
+      });
+    } catch (error: any) {
+      console.error('Migration error:', error);
+      return NextResponse.json(
+        { success: false, message: error.message || 'Migration failed' },
+        { status: 500 }
+      );
+    }
+  },
+
   setup: async (request: Request) => {
     try {
       const { searchParams } = new URL(request.url);
@@ -63,6 +162,11 @@ export const setupHandlers = {
           user_id INTEGER NOT NULL REFERENCES users(id),
           sort_order INTEGER DEFAULT 0,
           is_recommended BOOLEAN DEFAULT FALSE,
+          click_count INTEGER DEFAULT 0,
+          last_clicked_at DATETIME,
+          last_check_status INTEGER,
+          last_check_time DATETIME,
+          last_response_time INTEGER,
           created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
           updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
           UNIQUE(url, user_id)
@@ -102,6 +206,23 @@ export const setupHandlers = {
         );
       `;
       await sql`CREATE UNIQUE INDEX IF NOT EXISTS idx_app_settings_user ON app_settings(user_id);`;
+
+      // 迁移：为现有 links 表添加新字段
+      try {
+        await sql`ALTER TABLE links ADD COLUMN click_count INTEGER DEFAULT 0`;
+      } catch { /* 字段可能已存在 */ }
+      try {
+        await sql`ALTER TABLE links ADD COLUMN last_clicked_at DATETIME`;
+      } catch { /* 字段可能已存在 */ }
+      try {
+        await sql`ALTER TABLE links ADD COLUMN last_check_status INTEGER`;
+      } catch { /* 字段可能已存在 */ }
+      try {
+        await sql`ALTER TABLE links ADD COLUMN last_check_time DATETIME`;
+      } catch { /* 字段可能已存在 */ }
+      try {
+        await sql`ALTER TABLE links ADD COLUMN last_response_time INTEGER`;
+      } catch { /* 字段可能已存在 */ }
 
       // Create default admin user if not exists
       const email = 'admin@example.com';

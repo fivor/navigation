@@ -2,7 +2,52 @@ import { NextResponse } from 'next/server';
 import { sql } from '@/lib/db';
 import { getSession } from '@/lib/session';
 import { Link, Category } from '@/types';
-// import plist from 'plist';
+
+/**
+ * 解析 CSV 内容
+ * 支持格式：title,url,description,category
+ */
+function parseCSV(content: string): { title: string; url: string; description: string; category: string }[] {
+  const lines = content.trim().split('\n');
+  const results: { title: string; url: string; description: string; category: string }[] = [];
+  
+  // 跳过标题行（如果有）
+  const startIndex = lines[0].toLowerCase().includes('title') || 
+                     lines[0].toLowerCase().includes('url') ? 1 : 0;
+  
+  for (let i = startIndex; i < lines.length; i++) {
+    const line = lines[i].trim();
+    if (!line) continue;
+    
+    // 处理引号包裹的字段
+    const fields: string[] = [];
+    let current = '';
+    let inQuotes = false;
+    
+    for (const char of line) {
+      if (char === '"') {
+        inQuotes = !inQuotes;
+      } else if (char === ',' && !inQuotes) {
+        fields.push(current.trim());
+        current = '';
+      } else {
+        current += char;
+      }
+    }
+    fields.push(current.trim());
+    
+    if (fields.length >= 2 && fields[0] && fields[1]) {
+      results.push({
+        title: fields[0].replace(/^"|"$/g, ''),
+        url: fields[1].replace(/^"|"$/g, ''),
+        description: (fields[2] || '').replace(/^"|"$/g, ''),
+        category: (fields[3] || '').replace(/^"|"$/g, '')
+      });
+    }
+  }
+  
+  return results;
+}
 
 export const exportImportHandlers = {
   export: async (request: Request) => {
@@ -244,72 +289,119 @@ export const exportImportHandlers = {
         return NextResponse.json({ success: false, message: 'File is required' }, { status: 400 });
       }
 
-      /*
+      return NextResponse.json({ success: false, message: 'Safari import temporarily disabled due to Edge Runtime compatibility' }, { status: 501 });
+
+    } catch (error) {
+      console.error('Import Safari error:', error);
+      return NextResponse.json(
+        { success: false, message: 'Failed to import bookmarks' },
+        { status: 500 }
+      );
+    }
+  },
+
+  /**
+   * 批量导入链接（支持 CSV 和 JSON 格式）
+   */
+  importBatch: async (request: Request) => {
+    try {
+      const session = await getSession();
+      if (!session || session.role !== 'admin') {
+        return NextResponse.json({ success: false, message: 'Unauthorized' }, { status: 401 });
+      }
+      const userId = session.id as number;
+
+      const formData = await request.formData();
+      const file = formData.get('file') as File;
+      const defaultCategoryId = formData.get('categoryId') ? parseInt(formData.get('categoryId') as string) : null;
+
+      if (!file) {
+        return NextResponse.json({ success: false, message: '请选择要导入的文件' }, { status: 400 });
+      }
+
       const text = await file.text();
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const data = plist.parse(text) as any;
+      const fileName = file.name.toLowerCase();
+      let links: { title: string; url: string; description?: string; category?: string }[] = [];
+
+      // 根据文件扩展名解析
+      if (fileName.endsWith('.csv')) {
+        links = parseCSV(text);
+      } else if (fileName.endsWith('.json')) {
+        try {
+          const data = JSON.parse(text);
+          if (Array.isArray(data.links)) {
+            links = data.links;
+          } else if (Array.isArray(data)) {
+            links = data;
+          } else {
+            return NextResponse.json({ success: false, message: 'JSON 格式不正确' }, { status: 400 });
+          }
+        } catch {
+          return NextResponse.json({ success: false, message: 'JSON 解析失败' }, { status: 400 });
+        }
+      } else {
+        return NextResponse.json({ success: false, message: '不支持的文件格式，请使用 CSV 或 JSON' }, { status: 400 });
+      }
+
+      if (links.length === 0) {
+        return NextResponse.json({ success: false, message: '文件中没有找到有效的链接' }, { status: 400 });
+      }
 
       let importedCount = 0;
       let duplicateCount = 0;
-      const categoriesSet = new Set<string>();
+      let errorCount = 0;
+      const categoriesMap = new Map<string, number>();
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const processNode = async (node: any, parentId: number | null) => {
-        if (node.WebBookmarkType === 'WebBookmarkTypeList') {
-          // It's a folder
-          const title = node.Title;
-          const children = node.Children;
-
-          let currentCategoryId = parentId;
-
-          if (title && title !== 'BookmarksBar' && title !== 'BookmarksMenu' && title !== 'com.apple.ReadingList') {
-             categoriesSet.add(title);
-             
-             // Check if category exists
-             const catResult = await sql`SELECT id FROM categories WHERE name = ${title} AND user_id = ${userId}`;
-             if (catResult.rows.length > 0) {
-               currentCategoryId = catResult.rows[0].id as number;
-             } else {
-               const newCat = await sql`
-                 INSERT INTO categories (name, parent_id, user_id, sort_order)
-                 VALUES (${title}, ${parentId}, ${userId}, 0)
-                 RETURNING id
-               `;
-               currentCategoryId = newCat.rows[0].id as number;
-             }
-          } else if (!parentId && defaultCategoryId) {
-             currentCategoryId = defaultCategoryId;
+      for (const link of links) {
+        try {
+          // 验证必填字段
+          if (!link.title || !link.url) {
+            errorCount++;
+            continue;
           }
 
-          if (children && Array.isArray(children)) {
-            for (const child of children) {
-              await processNode(child, currentCategoryId);
-            }
+          // 验证 URL 格式
+          if (!link.url.startsWith('http://') && !link.url.startsWith('https://')) {
+            errorCount++;
+            continue;
           }
-        } else if (node.WebBookmarkType === 'WebBookmarkTypeLeaf') {
-          // It's a link
-          const url = node.URLString;
-          const title = node.URIDictionary?.title || 'Untitled';
 
-          if (url && parentId) {
-            try {
-               await sql`
-                  INSERT INTO links (title, url, description, icon, category_id, user_id, sort_order)
-                  VALUES (${title}, ${url}, null, null, ${parentId}, ${userId}, 0)
-                  ON CONFLICT (url, user_id) DO NOTHING
+          let categoryId = defaultCategoryId;
+
+          // 处理分类
+          if (link.category) {
+            if (categoriesMap.has(link.category)) {
+              categoryId = categoriesMap.get(link.category)!;
+            } else {
+              const catResult = await sql`SELECT id FROM categories WHERE name = ${link.category} AND user_id = ${userId}`;
+              if (catResult.rows.length > 0) {
+                categoryId = catResult.rows[0].id as number;
+                categoriesMap.set(link.category, categoryId);
+              } else {
+                const newCat = await sql`
+                  INSERT INTO categories (name, user_id, sort_order)
+                  VALUES (${link.category}, ${userId}, 0)
+                  RETURNING id
                 `;
-                importedCount++;
-            } catch {
-              duplicateCount++;
+                categoryId = newCat.rows[0].id as number;
+                categoriesMap.set(link.category, categoryId);
+              }
             }
           }
-        }
-      }
 
-      // Safari plist root usually has Children
-      if (data.Children) {
-        for (const child of data.Children) {
-          await processNode(child, defaultCategoryId);
+          if (categoryId) {
+            await sql`
+              INSERT INTO links (title, url, description, category_id, user_id, sort_order)
+              VALUES (${link.title}, ${link.url}, ${link.description || null}, ${categoryId}, ${userId}, 0)
+              ON CONFLICT (url, user_id) DO NOTHING
+            `;
+            importedCount++;
+          } else {
+            errorCount++;
+          }
+        } catch (e) {
+          console.error('Import link error:', e);
+          errorCount++;
         }
       }
 
@@ -317,15 +409,14 @@ export const exportImportHandlers = {
         success: true,
         imported: importedCount,
         duplicates: duplicateCount,
-        categories: Array.from(categoriesSet)
+        errors: errorCount,
+        total: links.length,
+        categories: Array.from(categoriesMap.keys())
       });
-      */
-      return NextResponse.json({ success: false, message: 'Safari import temporarily disabled due to Edge Runtime compatibility' }, { status: 501 });
-
     } catch (error) {
-      console.error('Import Safari error:', error);
+      console.error('Import batch error:', error);
       return NextResponse.json(
-        { success: false, message: 'Failed to import bookmarks' },
+        { success: false, message: '批量导入失败' },
         { status: 500 }
       );
     }

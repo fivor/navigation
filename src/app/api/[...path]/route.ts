@@ -6,6 +6,7 @@ import { setupHandlers } from '@/lib/api-handlers/setup';
 import { adminHandlers } from '@/lib/api-handlers/admin';
 import { exportImportHandlers } from '@/lib/api-handlers/export-import';
 import { metadataHandlers } from '@/lib/api-handlers/metadata';
+import { healthCheckHandlers } from '@/lib/api-handlers/health-check';
 
 export const runtime = 'edge';
 
@@ -17,6 +18,9 @@ export async function GET(request: Request, { params }: { params: Promise<{ path
   if (fullPath === 'setup') {
     return setupHandlers.setup(request);
   }
+  if (fullPath === 'migrate') {
+    return setupHandlers.migrate(request);
+  }
 
   // Categories routes
   if (fullPath === 'categories') {
@@ -27,6 +31,9 @@ export async function GET(request: Request, { params }: { params: Promise<{ path
   if (fullPath === 'links') {
     return linksHandlers.list(request);
   }
+  if (fullPath === 'links/popular') {
+    return linksHandlers.getPopular(request);
+  }
   
   // Admin settings
   if (fullPath === 'admin/settings') {
@@ -36,6 +43,20 @@ export async function GET(request: Request, { params }: { params: Promise<{ path
   // Admin stats
   if (fullPath === 'admin/stats') {
     return adminHandlers.getStats();
+  }
+
+  // Health check routes
+  if (fullPath === 'health-check') {
+    return healthCheckHandlers.checkAll(request);
+  }
+  if (fullPath === 'health-check/stats') {
+    return healthCheckHandlers.getStats();
+  }
+  if (fullPath.startsWith('health-check/') && fullPath.split('/').length === 2) {
+    const id = parseInt(fullPath.split('/')[1]);
+    if (!isNaN(id)) {
+      return healthCheckHandlers.checkOne(id);
+    }
   }
   
   // Export
@@ -67,6 +88,13 @@ export async function POST(request: Request, { params }: { params: Promise<{ pat
   if (fullPath === 'links') {
     return linksHandlers.create(request);
   }
+  // Track link click
+  if (fullPath.startsWith('links/') && fullPath.endsWith('/click')) {
+    const id = parseInt(fullPath.split('/')[1]);
+    if (!isNaN(id)) {
+      return linksHandlers.trackClick(id);
+    }
+  }
   
   // Admin routes
   if (fullPath === 'admin/icons/clear') {
@@ -85,6 +113,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ pat
   }
   if (fullPath === 'import/safari') {
     return exportImportHandlers.importSafari(request);
+  }
+  if (fullPath === 'import/batch') {
+    return exportImportHandlers.importBatch(request);
   }
   
   // Metadata
