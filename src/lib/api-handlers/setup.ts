@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { sql } from '@/lib/db';
+import { getRequestContext } from '@cloudflare/next-on-pages';
 import { hashPassword } from '@/lib/password';
 
 /**
@@ -106,9 +107,39 @@ export const setupHandlers = {
     try {
       const { searchParams } = new URL(request.url);
       const secret = searchParams.get('secret');
-      
-      // Simple protection
-      if (secret !== process.env.SETUP_SECRET && process.env.NODE_ENV === 'production') {
+
+      // Try to read SETUP_SECRET from Cloudflare Pages env bindings when available
+      let envSetupSecret: string | undefined = process.env.SETUP_SECRET;
+      try {
+        const ctx = getRequestContext();
+        if (ctx && ctx.env && (ctx.env as any).SETUP_SECRET) {
+          envSetupSecret = (ctx.env as any).SETUP_SECRET as string;
+        }
+        if (process.env.NODE_ENV !== 'production') {
+          const mask = (v: unknown) => typeof v === 'string' ? v.replace(/.(?=.{4})/g, '*') : v;
+          // eslint-disable-next-line no-console
+          console.log('[setup] env check', {
+            ctxEnv: !!(ctx?.env as any)?.SETUP_SECRET,
+            procEnv: !!process.env.SETUP_SECRET,
+            received: mask(secret),
+            nodeEnv: process.env.NODE_ENV
+          });
+        }
+      } catch (e) {
+        if (process.env.NODE_ENV !== 'production') {
+          const mask = (v: unknown) => typeof v === 'string' ? v.replace(/.(?=.{4})/g, '*') : v;
+          // eslint-disable-next-line no-console
+          console.log('[setup] env check', {
+            procEnv: !!process.env.SETUP_SECRET,
+            received: mask(secret),
+            nodeEnv: process.env.NODE_ENV
+          });
+        }
+      }
+
+      // Simple protection: if running in production-like mode, require matching secret
+      const isProd = process.env.NODE_ENV === 'production';
+      if (secret !== envSetupSecret && isProd) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
       }
 
@@ -147,6 +178,10 @@ export const setupHandlers = {
       `;
       await sql`
         CREATE INDEX IF NOT EXISTS idx_categories_parent_id ON categories(parent_id);
+      `;
+      // Ensure category names are unique per user to avoid duplicate creations (race conditions)
+      await sql`
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_categories_user_name ON categories(user_id, name);
       `;
 
       // Create links table
