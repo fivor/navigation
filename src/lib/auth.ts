@@ -1,6 +1,9 @@
 import { SignJWT, jwtVerify } from 'jose';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'default-secret-key-change-it';
+if (!process.env.JWT_SECRET && process.env.NODE_ENV === 'production') {
+  throw new Error('Missing JWT_SECRET in production');
+}
 const SECRET_KEY = new TextEncoder().encode(JWT_SECRET);
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any

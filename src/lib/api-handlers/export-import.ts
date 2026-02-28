@@ -390,12 +390,16 @@ export const exportImportHandlers = {
           }
 
           if (categoryId) {
-            await sql`
+            const insertRes = await sql`
               INSERT INTO links (title, url, description, category_id, user_id, sort_order)
               VALUES (${link.title}, ${link.url}, ${link.description || null}, ${categoryId}, ${userId}, 0)
               ON CONFLICT (url, user_id) DO NOTHING
             `;
-            importedCount++;
+            if (insertRes.rowCount > 0) {
+              importedCount++;
+            } else {
+              duplicateCount++;
+            }
           } else {
             errorCount++;
           }

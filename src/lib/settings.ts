@@ -13,6 +13,13 @@ export interface R2Config {
 // Web Crypto API 兼容的加密工具函数
 async function getEncryptionKey(): Promise<CryptoKey> {
   const base = process.env.SETTINGS_ENC_KEY || process.env.AUTH_SECRET || 'fallback-key-for-navigation';
+  if (!process.env.SETTINGS_ENC_KEY && !process.env.AUTH_SECRET) {
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error('Missing SETTINGS_ENC_KEY or AUTH_SECRET in production');
+    }
+    // eslint-disable-next-line no-console
+    console.warn('[settings] Using fallback encryption key in non-production environment');
+  }
   const encoder = new TextEncoder();
   const data = encoder.encode(base);
   
