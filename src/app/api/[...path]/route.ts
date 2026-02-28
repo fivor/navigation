@@ -8,7 +8,8 @@ import { exportImportHandlers } from '@/lib/api-handlers/export-import';
 import { metadataHandlers } from '@/lib/api-handlers/metadata';
 import { healthCheckHandlers } from '@/lib/api-handlers/health-check';
 
-export const runtime = 'edge';
+// 移除 Edge Runtime 配置，让本地开发使用 Node.js 运行时和 SQLite
+// export const runtime = 'edge';
 
 export async function GET(request: Request, { params }: { params: Promise<{ path: string[] }> }) {
   const { path } = await params;

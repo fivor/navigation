@@ -52,3 +52,6 @@ local.db
 local.db-journal
 local.db-shm
 local.db-wal
+
+# Local deployment guide (keep private)
+DEPLOY_GUIDE.md

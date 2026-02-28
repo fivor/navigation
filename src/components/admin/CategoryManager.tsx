@@ -15,34 +15,25 @@ interface CategoryManagerProps {
 export function CategoryManager({ initialCategories = [] }: CategoryManagerProps) {
   const router = useRouter();
   const [categories, setCategories] = useState(initialCategories);
+  const isMounted = useRef(false);
   
-  // 监听 initialCategories 变化并同步到本地状态
+  // 仅在组件挂载时初始化一次
   useEffect(() => {
-    // 只有当传入的 initialCategories 与当前的 categories 不一致（且确实有数据变化）时才更新
-    // 简单的引用比较可能不够，因为每次 router.refresh() 都可能产生新数组引用
-    // 这里我们做一个简单的 id 列表对比，或者直接更新
-    
-    // 为了防止“本地刚添加完 -> router.refresh() 触发 -> 导致数据回跳或重复”等问题，
-    // 我们信任 initialCategories 为最新数据源。
-    
-    // 去重逻辑：确保不会出现重复 ID
-    const uniqueCategories = initialCategories.filter((v, i, a) => a.findIndex(t => t.id === v.id) === i);
-    setCategories(uniqueCategories);
-  }, [initialCategories]);
-  
-  // Only fetch if initialCategories is empty on mount (SPA navigation to this page)
-  useEffect(() => {
-    if (initialCategories.length === 0) {
-      fetch('/api/categories')
-        .then(res => res.json())
-        .then((res: any) => {
-          if (res.success && res.data) {
-            setCategories(res.data);
-          }
-        })
-        .catch(err => console.error('Failed to load categories', err));
+    if (!isMounted.current) {
+      isMounted.current = true;
+      
+      if (initialCategories.length === 0) {
+        fetch('/api/categories')
+          .then(res => res.json())
+          .then((res: any) => {
+            if (res.success && res.data) {
+              setCategories(res.data);
+            }
+          })
+          .catch(err => console.error('Failed to load categories', err));
+      }
     }
-  }, []); // Run once on mount if empty
+  }, [initialCategories]);
   const [isOpen, setIsOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -89,32 +80,28 @@ export function CategoryManager({ initialCategories = [] }: CategoryManagerProps
         setIsOpen(false);
         const responseData = await res.json() as any;
         
-        // Update local state immediately
-        // Removed manual state update to avoid duplicates with router.refresh()
-        // The router.refresh() call below will trigger a re-fetch of the data
-        /*
         if (responseData.success && responseData.data) {
-          const newCategory = responseData.data;
+          const updatedCategory = responseData.data;
           
           setCategories(prev => {
             if (isEditing) {
-              return prev.map(c => c.id === newCategory.id ? { ...c, ...newCategory } : c);
+              // 更新现有分类
+              return prev.map(c => c.id === updatedCategory.id ? { ...c, ...updatedCategory } : c);
             } else {
-              // Check if category already exists to avoid duplicates (e.g. from router.refresh race condition)
-              if (prev.some(c => c.id === newCategory.id)) {
+              // 检查是否已存在以避免重复
+              if (prev.some(c => c.id === updatedCategory.id)) {
                 return prev;
               }
-              // Add new category
+              // 添加新分类
               const categoryWithExtras = {
-                ...newCategory,
-                parent_name: categories.find(p => p.id === newCategory.parent_id)?.name || null,
+                ...updatedCategory,
+                parent_name: prev.find(p => p.id === updatedCategory.parent_id)?.name || null,
                 links_count: 0
               };
               return [categoryWithExtras, ...prev];
             }
           });
         }
-        */
         
         router.refresh();
       } else {

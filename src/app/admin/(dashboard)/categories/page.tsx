@@ -3,7 +3,8 @@ import { getCategories } from '@/lib/api-handlers/categories';
 import { getSession } from '@/lib/session';
 
 export const dynamic = 'force-dynamic';
-export const runtime = 'edge';
+// 移除 Edge Runtime 配置，让本地开发使用 Node.js 运行时
+// export const runtime = 'edge';
 
 export default async function AdminCategoriesPage() {
   const session = await getSession();
